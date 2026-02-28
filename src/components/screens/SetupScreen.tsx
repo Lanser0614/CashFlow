@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
+import { useRoomStore } from '../../store/roomStore'
 import { PROFESSIONS } from '../../data/professions'
 import { formatCurrency } from '../../utils'
 import { computePlayerStats } from '../../utils/playerStats'
@@ -159,7 +160,23 @@ export function SetupScreen() {
                 </motion.button>
               ))}
             </div>
-            <div className="flex items-center justify-center gap-3 mt-6">
+            {/* Online play button */}
+            {isAuthenticated && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full mt-5 py-3 rounded-xl font-bold text-base text-white"
+                style={{
+                  background: 'linear-gradient(135deg, #14b8a6, #6366f1)',
+                  border: 'none',
+                }}
+                onClick={() => useRoomStore.getState().setScreen('lobby')}
+              >
+                🌐 Играть онлайн
+              </motion.button>
+            )}
+
+            <div className="flex items-center justify-center gap-3 mt-4">
               <button
                 className="btn-ghost text-sm"
                 onClick={() => setShowTutorial(true)}

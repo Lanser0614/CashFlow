@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
+import { useRoomStore } from '../../store/roomStore'
+import { startOnlineSync } from '../../store/onlineSync'
 import { GameBoard } from '../board/GameBoard'
 import { BoardLegend } from '../board/BoardLegend'
 import { TurnPanel } from '../game/TurnPanel'
@@ -19,11 +21,33 @@ export function GameScreen() {
   const resetGame = useGameStore((s) => s.resetGame)
   const players = useGameStore((s) => s.players)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const roomScreen = useRoomStore((s) => s.screen)
+  const room = useRoomStore((s) => s.room)
+  const isOnline = roomScreen === 'game_online'
+
+  // Start online sync + polling when in online mode
+  useEffect(() => {
+    if (!isOnline) return
+    const roomStore = useRoomStore.getState()
+    roomStore.startPollingState()
+    const unsub = startOnlineSync()
+    return () => {
+      roomStore.stopPollingState()
+      unsub()
+    }
+  }, [isOnline])
+
+  const handleExit = () => {
+    if (isOnline) {
+      useRoomStore.getState().leaveRoom()
+    }
+    resetGame()
+  }
 
   return (
     <div
       className="h-screen flex flex-col overflow-hidden"
-      style={{ background: 'var(--color-bg)', minWidth: '900px' }}
+      style={{ background: 'var(--color-bg)' }}
     >
       {/* Top bar */}
       <div
@@ -66,7 +90,19 @@ export function GameScreen() {
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {isAuthenticated && (
+          {/* Online room code indicator */}
+          {isOnline && room && (
+            <>
+              <span
+                className="text-xs font-mono px-2 py-1 rounded"
+                style={{ background: 'rgba(20, 184, 166, 0.15)', color: '#14b8a6', border: '1px solid rgba(20,184,166,0.25)' }}
+              >
+                🌐 {room.code}
+              </span>
+              <span className="w-px h-4" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            </>
+          )}
+          {isAuthenticated && !isOnline && (
             <>
               <button
                 className="text-xs text-slate-500 hover:text-indigo-300 transition-colors px-2 py-1 rounded"
@@ -87,7 +123,7 @@ export function GameScreen() {
           )}
           <button
             className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1"
-            onClick={resetGame}
+            onClick={handleExit}
           >
             ✕ Выйти
           </button>
@@ -99,7 +135,7 @@ export function GameScreen() {
         {/* Left: Turn panel */}
         <div
           className="flex-shrink-0 flex flex-col gap-3 p-3 overflow-y-auto"
-          style={{ width: '270px', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+          style={{ width: 'min(270px, 40vw)', borderRight: '1px solid rgba(255,255,255,0.06)' }}
         >
           <TurnPanel />
         </div>
@@ -125,15 +161,15 @@ export function GameScreen() {
               <GameBoard />
             </div>
           </div>
-          {/* Legend */}
-          <div className="flex-shrink-0 w-full" style={{ maxWidth: '520px' }}>
+          {/* Legend — hidden on narrow screens */}
+          <div className="flex-shrink-0 w-full hidden md:block" style={{ maxWidth: '520px' }}>
             <BoardLegend />
           </div>
         </div>
 
-        {/* Right: players + log */}
+        {/* Right: players + log — hidden on narrow screens */}
         <div
-          className="flex-shrink-0 flex flex-col overflow-hidden"
+          className="flex-shrink-0 hidden lg:flex flex-col overflow-hidden"
           style={{ width: '270px', borderLeft: '1px solid rgba(255,255,255,0.06)' }}
         >
           <div

@@ -68,6 +68,7 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
     try {
       const state = useGameStore.getState()
       const currentPlayer = state.players[state.currentPlayerIndex]
+      console.log(currentPlayer)
       await gameApi.createSave({
         name: saveName.trim(),
         game_state: getSerializableState(),

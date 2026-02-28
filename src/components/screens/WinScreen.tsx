@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
+import { useRoomStore } from '../../store/roomStore'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
 import { gameApi } from '../../services/api'
@@ -13,6 +14,14 @@ export function WinScreen() {
   const resetGame = useGameStore((s) => s.resetGame)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const resultPosted = useRef(false)
+
+  // Stop polling on win
+  useEffect(() => {
+    const roomStore = useRoomStore.getState()
+    if (roomStore.screen === 'game_online') {
+      roomStore.stopPollingState()
+    }
+  }, [])
 
   // Post game result to backend
   useEffect(() => {
@@ -185,7 +194,10 @@ export function WinScreen() {
           transition={{ delay: 0.7 }}
           className="flex gap-3 justify-center"
         >
-          <button className="btn-primary text-lg px-10" onClick={resetGame}>
+          <button className="btn-primary text-lg px-10" onClick={() => {
+            useRoomStore.getState().resetRoom()
+            resetGame()
+          }}>
             🎲 Новая игра
           </button>
         </motion.div>

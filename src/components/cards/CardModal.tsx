@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
+import { useRoomStore } from '../../store/roomStore'
 import { formatCurrency } from '../../utils'
 import type { SmallDeal, BigDeal, Doodad, MarketCard } from '../../types'
+
+const CARD_TIMER_SECONDS = 30
 
 function DealCardContent({ deal, player, onBuy, onPass }: {
   deal: SmallDeal | BigDeal
@@ -321,9 +324,52 @@ export function CardModal() {
   const sellAsset = useGameStore((s) => s.sellAsset)
   const passMarket = useGameStore((s) => s.passMarket)
 
+  const isOnline = useRoomStore((s) => s.screen) === 'game_online'
+  const isMyTurn = useRoomStore((s) => s.isMyTurn)()
+
   const player = players[currentPlayerIndex]
   const visible = turnPhase === 'card_shown' || turnPhase === 'market_sell'
   const card = turnPhase === 'market_sell' ? pendingMarketCard : activeCard
+
+  // Auto-decline timer for online mode
+  const [timeLeft, setTimeLeft] = useState(CARD_TIMER_SECONDS)
+  const timerActive = visible && (!isOnline || isMyTurn)
+  const autoActionFired = useRef(false)
+
+  useEffect(() => {
+    if (!timerActive) {
+      setTimeLeft(CARD_TIMER_SECONDS)
+      autoActionFired.current = false
+      return
+    }
+    setTimeLeft(CARD_TIMER_SECONDS)
+    autoActionFired.current = false
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [timerActive, turnPhase])
+
+  // Fire auto-action when timer reaches 0
+  useEffect(() => {
+    if (timeLeft !== 0 || !timerActive || autoActionFired.current) return
+    autoActionFired.current = true
+    const currentCard = useGameStore.getState().activeCard
+    const currentPhase = useGameStore.getState().turnPhase
+    if (currentPhase === 'market_sell') {
+      passMarket()
+    } else if (currentCard?.type === 'doodad') {
+      closeDoodad()
+    } else {
+      passDeal()
+    }
+  }, [timeLeft, timerActive, passDeal, closeDoodad, passMarket])
 
   if (!visible || !card || !player) return null
 
@@ -360,6 +406,36 @@ export function CardModal() {
           className="game-card w-full max-w-md p-6"
           style={{ maxHeight: '90vh', overflowY: 'auto' }}
         >
+          {/* Auto-decline timer bar */}
+          {timerActive && (
+            <div className="mb-4 -mt-1">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-slate-400">Автоотказ через</span>
+                <span
+                  className="font-bold tabular-nums"
+                  style={{ color: timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#22c55e' }}
+                >
+                  {timeLeft}с
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: timeLeft <= 5
+                      ? '#ef4444'
+                      : timeLeft <= 10
+                        ? 'linear-gradient(90deg, #f59e0b, #eab308)'
+                        : 'linear-gradient(90deg, #22c55e, #16a34a)',
+                  }}
+                  initial={{ width: '100%' }}
+                  animate={{ width: `${(timeLeft / CARD_TIMER_SECONDS) * 100}%` }}
+                  transition={{ duration: 0.5, ease: 'linear' }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Card header */}
           <div className="flex items-center gap-3 mb-5 pb-4"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

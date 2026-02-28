@@ -1,9 +1,13 @@
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
+import { useRoomStore } from '../../store/roomStore'
 import { Dice } from './Dice'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
 import { RAT_RACE_SPACES, FAST_TRACK_SPACES } from '../../data/board'
+
+const END_TURN_TIMER_SECONDS = 5
 
 export function TurnPanel() {
   const players = useGameStore((s) => s.players)
@@ -12,6 +16,41 @@ export function TurnPanel() {
   const diceValues = useGameStore((s) => s.diceValues)
   const rollDiceAction = useGameStore((s) => s.rollDiceAction)
   const endTurn = useGameStore((s) => s.endTurn)
+  const roomScreen = useRoomStore((s) => s.screen)
+  const isOnline = roomScreen === 'game_online'
+  const isMyTurn = useRoomStore((s) => s.isMyTurn)()
+  const canAct = !isOnline || isMyTurn
+
+  // Auto-advance timer for end_turn in online mode
+  const [endTurnTimeLeft, setEndTurnTimeLeft] = useState(END_TURN_TIMER_SECONDS)
+  const endTurnTimerActive = turnPhase === 'end_turn' && canAct
+  const autoEndFired = useRef(false)
+
+  useEffect(() => {
+    if (!endTurnTimerActive) {
+      setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+      autoEndFired.current = false
+      return
+    }
+    setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+    autoEndFired.current = false
+    const interval = setInterval(() => {
+      setEndTurnTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [endTurnTimerActive])
+
+  useEffect(() => {
+    if (endTurnTimeLeft !== 0 || !endTurnTimerActive || autoEndFired.current) return
+    autoEndFired.current = true
+    endTurn()
+  }, [endTurnTimeLeft, endTurnTimerActive, endTurn])
 
   const player = players[currentPlayerIndex]
   if (!player) return null
@@ -85,7 +124,22 @@ export function TurnPanel() {
 
       {/* Action buttons */}
       <AnimatePresence mode="wait">
-        {turnPhase === 'roll' && (
+        {/* Online: waiting for other player */}
+        {isOnline && !canAct && turnPhase === 'roll' && (
+          <motion.div
+            key="waiting"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-center py-3 rounded-xl text-sm"
+            style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
+          >
+            <div className="text-slate-400 mb-1">Ожидание хода</div>
+            <div className="text-indigo-300 font-semibold">{player.name}...</div>
+          </motion.div>
+        )}
+
+        {turnPhase === 'roll' && canAct && (
           <motion.button
             key="roll-btn"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -120,7 +174,7 @@ export function TurnPanel() {
           </motion.div>
         )}
 
-        {turnPhase === 'end_turn' && (
+        {turnPhase === 'end_turn' && canAct && (
           <motion.button
             key="end-btn"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -130,7 +184,19 @@ export function TurnPanel() {
             onClick={endTurn}
           >
             ➡️ Следующий игрок
+            <span className="ml-2 text-sm opacity-60">({endTurnTimeLeft}с)</span>
           </motion.button>
+        )}
+
+        {turnPhase === 'end_turn' && isOnline && !canAct && (
+          <motion.div
+            key="waiting-end"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center text-slate-500 py-2 text-sm"
+          >
+            Ожидание завершения хода...
+          </motion.div>
         )}
       </AnimatePresence>
 
