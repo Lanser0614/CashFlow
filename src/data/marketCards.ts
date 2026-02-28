@@ -1,0 +1,173 @@
+import type { MarketCard } from '../types'
+
+export const MARKET_CARDS: MarketCard[] = [
+  // АКЦИИ - РОСТ
+  {
+    id: 'mc_myt4u_5',
+    type: 'market',
+    title: 'MYT4U растёт!',
+    description: 'Акции MYT4U торгуются по $5/акция. Продайте их сейчас!',
+    effect: { kind: 'stock_price', symbol: 'MYT4U', price: 5 },
+    canSell: true,
+  },
+  {
+    id: 'mc_myt4u_15',
+    type: 'market',
+    title: 'MYT4U стремительно растёт!',
+    description: 'Акции MYT4U торгуются по $15/акция! Отличная прибыль!',
+    effect: { kind: 'stock_price', symbol: 'MYT4U', price: 15 },
+    canSell: true,
+  },
+  {
+    id: 'mc_on2u_20',
+    type: 'market',
+    title: 'ON2U взлетает!',
+    description: 'Акции ON2U торгуются по $20/акция! Продавайте!',
+    effect: { kind: 'stock_price', symbol: 'ON2U', price: 20 },
+    canSell: true,
+  },
+  {
+    id: 'mc_on2u_30',
+    type: 'market',
+    title: 'ON2U бьёт рекорды!',
+    description: 'ON2U торгуется по $30/акция. Рынок в эйфории!',
+    effect: { kind: 'stock_price', symbol: 'ON2U', price: 30 },
+    canSell: true,
+  },
+  {
+    id: 'mc_gro4us_10',
+    type: 'market',
+    title: 'GRO4US растёт',
+    description: 'Акции GRO4US теперь по $10/акция. Хорошая прибыль.',
+    effect: { kind: 'stock_price', symbol: 'GRO4US', price: 10 },
+    canSell: true,
+  },
+  {
+    id: 'mc_ok4u_25',
+    type: 'market',
+    title: 'OK4U набирает силу',
+    description: 'OK4U торгуется по $25/акция. Удвоили ваши деньги!',
+    effect: { kind: 'stock_price', symbol: 'OK4U', price: 25 },
+    canSell: true,
+  },
+
+  // АКЦИИ - ПАДЕНИЕ
+  {
+    id: 'mc_stock_crash',
+    type: 'market',
+    title: 'Обвал фондового рынка!',
+    description: 'Все акции упали до $0! Паника на рынке!',
+    effect: { kind: 'stock_crash' },
+    canSell: false,
+  },
+  {
+    id: 'mc_myt4u_crash',
+    type: 'market',
+    title: 'MYT4U банкрот',
+    description: 'Компания MYT4U объявила о банкротстве. Акции стоят $0.',
+    effect: { kind: 'stock_price', symbol: 'MYT4U', price: 0 },
+    canSell: false,
+  },
+
+  // СПЕКУЛЯЦИИ
+  {
+    id: 'mc_coins_3x',
+    type: 'market',
+    title: 'Покупатель монет!',
+    description: 'Коллекционер готов купить монеты за 3× от цены покупки!',
+    effect: { kind: 'sell_speculation', tag: 'coins', multiplier: 3 },
+    canSell: true,
+  },
+  {
+    id: 'mc_gold_rise',
+    type: 'market',
+    title: 'Золото растёт!',
+    description: 'Цена золота выросла! Продайте своё золото с прибылью 50%.',
+    effect: { kind: 'sell_speculation', tag: 'gold', multiplier: 1.5 },
+    canSell: true,
+  },
+  {
+    id: 'mc_fixer_upper_sell',
+    type: 'market',
+    title: 'Рынок жилья растёт!',
+    description: 'Покупатель предлагает 1.5× за "дом под ремонт".',
+    effect: { kind: 'sell_speculation', tag: 'fixer_upper', multiplier: 1.5 },
+    canSell: true,
+  },
+  {
+    id: 'mc_tech_ipo',
+    type: 'market',
+    title: 'IPO технологий!',
+    description: 'Ваш стартап вышел на IPO! Продайте за 2× вложения.',
+    effect: { kind: 'sell_speculation', tag: 'tech_startup', multiplier: 2 },
+    canSell: true,
+  },
+
+  // НЕДВИЖИМОСТЬ
+  {
+    id: 'mc_3br_boom',
+    type: 'market',
+    title: 'Бум жилья!',
+    description: 'Дома 3BR/2BA продаются за 2× от цены покупки!',
+    effect: { kind: 'real_estate_boom', propertyTag: '3br2ba', multiplier: 2 },
+    canSell: true,
+  },
+  {
+    id: 'mc_duplex_boom',
+    type: 'market',
+    title: 'Дуплексы нарасхват!',
+    description: 'Дуплексы продаются за 1.5× от цены покупки!',
+    effect: { kind: 'real_estate_boom', propertyTag: 'duplex', multiplier: 1.5 },
+    canSell: true,
+  },
+  {
+    id: 'mc_commercial_boom',
+    type: 'market',
+    title: 'Коммерческая недвижимость растёт!',
+    description: 'Офисы продаются с наценкой 25%. Продайте коммерческую собственность!',
+    effect: { kind: 'real_estate_boom', propertyTag: 'commercial', multiplier: 1.25 },
+    canSell: true,
+  },
+  {
+    id: 'mc_real_estate_crash',
+    type: 'market',
+    title: 'Кризис недвижимости!',
+    description: 'Цены на жильё упали на 20%. Ваши активы обесценились.',
+    effect: { kind: 'real_estate_crash', loss: 0.2 },
+    canSell: false,
+  },
+
+  // НЕЙТРАЛЬНЫЕ
+  {
+    id: 'mc_interest_cut',
+    type: 'market',
+    title: 'ЦБ снизил ставку',
+    description: 'Центральный банк снизил процентную ставку. Ваши ипотечные платежи немного снизились.',
+    effect: { kind: 'interest_rate_cut', newRate: 0.9 },
+    canSell: false,
+  },
+  {
+    id: 'mc_gro4us_boom',
+    type: 'market',
+    title: 'GRO4US взлетает!',
+    description: 'GRO4US получили крупный контракт. Акции теперь $25/акция!',
+    effect: { kind: 'stock_price', symbol: 'GRO4US', price: 25 },
+    canSell: true,
+  },
+  {
+    id: 'mc_condo_boom',
+    type: 'market',
+    title: 'Квартиры растут!',
+    description: 'Студии и однокомнатные квартиры продаются за 1.8× цены!',
+    effect: { kind: 'real_estate_boom', propertyTag: 'condo', multiplier: 1.8 },
+    canSell: true,
+  },
+  {
+    id: 'mc_oil_boom',
+    type: 'market',
+    title: 'Нефтяной бум!',
+    description: 'Цены на нефть выросли. Продайте нефтяную скважину за 2× вложения!',
+    effect: { kind: 'sell_speculation', tag: 'oil', multiplier: 2 },
+    canSell: true,
+  },
+]
