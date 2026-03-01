@@ -110,7 +110,6 @@ export function PlayerSelector() {
                       background: 'rgba(15, 17, 23, 0.8)',
                       border: `1px solid ${player.color}30`,
                       borderTop: 'none',
-                      maxHeight: '380px',
                     }}
                   >
                     <FinancialStatement playerId={player.id} />

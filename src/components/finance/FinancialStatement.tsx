@@ -14,9 +14,9 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
     undefined: '#e2e8f0',
   }
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-white/5">
-      <span className="text-sm text-slate-400">{label}</span>
-      <span className="text-sm font-semibold" style={{ color: colors[accent ?? 'undefined'] }}>
+    <div className="flex items-center justify-between py-1.5 border-b border-white/5 gap-2">
+      <span className="text-sm text-slate-400 min-w-0 truncate">{label}</span>
+      <span className="text-sm font-semibold flex-shrink-0" style={{ color: colors[accent ?? 'undefined'] }}>
         {value}
       </span>
     </div>
@@ -54,14 +54,14 @@ export function FinancialStatement({ playerId }: { playerId: string }) {
   ]
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Tabs */}
       <div className="flex gap-1 mb-3">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all"
+            className="flex-1 py-1.5 px-1.5 sm:px-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all"
             style={{
               background: tab === t.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)',
               color: tab === t.id ? '#a5b4fc' : '#64748b',
@@ -73,7 +73,7 @@ export function FinancialStatement({ playerId }: { playerId: string }) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div>
         <AnimatePresence mode="wait">
           {tab === 'overview' && (
             <motion.div
@@ -114,7 +114,7 @@ export function FinancialStatement({ playerId }: { playerId: string }) {
               >
                 <div className="text-xs text-slate-400 mb-1">Денежный поток в месяц</div>
                 <div
-                  className="text-2xl font-bold"
+                  className="text-xl sm:text-2xl font-bold"
                   style={{ color: stats.monthlyCashFlow >= 0 ? '#22c55e' : '#ef4444' }}
                 >
                   {stats.monthlyCashFlow >= 0 ? '+' : ''}{formatCurrency(stats.monthlyCashFlow)}

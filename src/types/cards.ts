@@ -58,4 +58,17 @@ export interface MarketCard {
   canSell: boolean        // whether player can sell assets
 }
 
-export type AnyCard = SmallDeal | BigDeal | Doodad | MarketCard
+export interface SurpriseCard {
+  id: string
+  type: 'surprise'
+  title: string
+  description: string
+  effect:
+    | { kind: 'bonus_cash'; amount: number }
+    | { kind: 'lose_cash'; amount: number }
+    | { kind: 'free_asset'; deal: SmallDeal }
+    | { kind: 'extra_turn' }
+    | { kind: 'skip_turn' }
+}
+
+export type AnyCard = SmallDeal | BigDeal | Doodad | MarketCard | SurpriseCard

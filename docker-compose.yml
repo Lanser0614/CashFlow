@@ -1,0 +1,67 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    working_dir: /workspace
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+      - frontend_node_modules:/workspace/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    working_dir: /workspace/backend
+    command: >
+      sh -lc "composer install --no-interaction --prefer-dist &&
+      php artisan migrate --force &&
+      php artisan serve --host=0.0.0.0 --port=8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      APP_KEY: base64:Y2FzaGZsb3cxMDFkb2NrZXJjb21wb3Nla2V5MTIzNDU=
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: cashflow
+      DB_USERNAME: cashflow
+      DB_PASSWORD: cashflow
+      LOG_CHANNEL: stderr
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+      - backend_vendor:/workspace/backend/vendor
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: cashflow
+      MYSQL_USER: cashflow
+      MYSQL_PASSWORD: cashflow
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  frontend_node_modules:
+  backend_vendor:
+  mysql_data:

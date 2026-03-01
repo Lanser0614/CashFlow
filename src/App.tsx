@@ -3,6 +3,7 @@ import { useGameStore } from './store/gameStore'
 import { useAuthStore } from './store/authStore'
 import { useRoomStore } from './store/roomStore'
 import { AuthScreen } from './components/screens/AuthScreen'
+import { ModeSelectScreen } from './components/screens/ModeSelectScreen'
 import { SetupScreen } from './components/screens/SetupScreen'
 import { GameScreen } from './components/screens/GameScreen'
 import { WinScreen } from './components/screens/WinScreen'
@@ -59,6 +60,7 @@ function App() {
   }
 
   // Local game flow
+  if (phase === 'mode_select') return <ModeSelectScreen />
   if (phase === 'setup') return <SetupScreen />
   if (phase === 'won') return <WinScreen />
   return <GameScreen />

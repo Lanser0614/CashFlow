@@ -12,6 +12,8 @@ export function WinScreen() {
   const players = useGameStore((s) => s.players)
   const turnNumber = useGameStore((s) => s.turnNumber)
   const resetGame = useGameStore((s) => s.resetGame)
+  const gameMode = useGameStore((s) => s.gameMode)
+  const isQuick = gameMode === 'quick'
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const resultPosted = useRef(false)
 
@@ -93,12 +95,12 @@ export function WinScreen() {
         className="relative z-10 w-full max-w-xl"
       >
         {/* Winner card */}
-        <div className="game-card p-8 text-center mb-6">
+        <div className="game-card p-5 sm:p-8 text-center mb-6">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', delay: 0.2 }}
-            className="text-7xl mb-4"
+            className="text-5xl sm:text-7xl mb-4"
           >
             🏆
           </motion.div>
@@ -107,7 +109,7 @@ export function WinScreen() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-4xl font-bold mb-2"
+            className="text-3xl sm:text-4xl font-bold mb-2"
             style={{
               background: 'linear-gradient(135deg, #f59e0b, #fcd34d)',
               WebkitBackgroundClip: 'text',
@@ -129,7 +131,9 @@ export function WinScreen() {
             <div
               className="text-lg text-slate-400 mb-6"
             >
-              {winner.professionName} достиг финансовой свободы!
+              {isQuick
+                ? `Пассивный доход превысил расходы за ${turnNumber} ходов!`
+                : `${winner.professionName} достиг финансовой свободы!`}
             </div>
           </motion.div>
 
@@ -140,22 +144,29 @@ export function WinScreen() {
             transition={{ delay: 0.5 }}
             className="grid grid-cols-2 gap-3 mb-6"
           >
-            <div className="rounded-xl p-3" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
+            <div className="rounded-xl p-2.5 sm:p-3" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
               <div className="text-xs text-green-400 mb-1">Кэш на руках</div>
-              <div className="text-xl font-bold text-white">{formatCurrency(winner.cash)}</div>
+              <div className="text-lg sm:text-xl font-bold text-white">{formatCurrency(winner.cash)}</div>
             </div>
-            <div className="rounded-xl p-3" style={{ background: 'rgba(99, 102, 241, 0.1)' }}>
+            <div className="rounded-xl p-2.5 sm:p-3" style={{ background: 'rgba(99, 102, 241, 0.1)' }}>
               <div className="text-xs text-indigo-400 mb-1">Пассивный доход</div>
-              <div className="text-xl font-bold text-white">{formatCurrency(stats.passiveIncome)}/мес</div>
+              <div className="text-lg sm:text-xl font-bold text-white">{formatCurrency(stats.passiveIncome)}/мес</div>
             </div>
-            <div className="rounded-xl p-3" style={{ background: 'rgba(245, 158, 11, 0.1)' }}>
+            <div className="rounded-xl p-2.5 sm:p-3" style={{ background: 'rgba(245, 158, 11, 0.1)' }}>
               <div className="text-xs text-yellow-400 mb-1">Чистый капитал</div>
-              <div className="text-xl font-bold text-white">{formatCurrency(stats.netWorth)}</div>
+              <div className="text-lg sm:text-xl font-bold text-white">{formatCurrency(stats.netWorth)}</div>
             </div>
-            <div className="rounded-xl p-3" style={{ background: 'rgba(236, 72, 153, 0.1)' }}>
-              <div className="text-xs text-pink-400 mb-1">Дети</div>
-              <div className="text-xl font-bold text-white">{winner.babies} {'👶'.repeat(Math.min(winner.babies, 5))}</div>
-            </div>
+            {isQuick ? (
+              <div className="rounded-xl p-2.5 sm:p-3" style={{ background: 'rgba(236, 72, 153, 0.1)' }}>
+                <div className="text-xs text-pink-400 mb-1">Ходов</div>
+                <div className="text-lg sm:text-xl font-bold text-white">{turnNumber} 🎲</div>
+              </div>
+            ) : (
+              <div className="rounded-xl p-2.5 sm:p-3" style={{ background: 'rgba(236, 72, 153, 0.1)' }}>
+                <div className="text-xs text-pink-400 mb-1">Дети</div>
+                <div className="text-lg sm:text-xl font-bold text-white">{winner.babies} {'👶'.repeat(Math.min(winner.babies, 5))}</div>
+              </div>
+            )}
           </motion.div>
         </div>
 
@@ -172,15 +183,19 @@ export function WinScreen() {
               {otherPlayers.map((p) => {
                 const ps = computePlayerStats(p)
                 return (
-                  <div key={p.id} className="flex items-center gap-3">
+                  <div key={p.id} className="flex items-center gap-3 flex-wrap">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                    <span className="text-sm text-white flex-1">{p.name}</span>
-                    <span className="text-xs text-slate-400">
-                      Пассивный: {formatCurrency(ps.passiveIncome)}/мес
-                    </span>
-                    <span className="text-xs font-medium" style={{ color: '#22c55e' }}>
-                      {formatCurrency(p.cash)}
-                    </span>
+                    <span className="text-sm text-white flex-1 min-w-[80px] truncate">{p.name}</span>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs text-slate-400">
+                        <span className="hidden sm:inline">Пассивный: </span>
+                        <span className="sm:hidden">П: </span>
+                        {formatCurrency(ps.passiveIncome)}/мес
+                      </span>
+                      <span className="text-xs font-medium" style={{ color: '#22c55e' }}>
+                        {formatCurrency(p.cash)}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
@@ -194,7 +209,7 @@ export function WinScreen() {
           transition={{ delay: 0.7 }}
           className="flex gap-3 justify-center"
         >
-          <button className="btn-primary text-lg px-10" onClick={() => {
+          <button className="btn-primary text-lg px-10 w-full sm:w-auto" onClick={() => {
             useRoomStore.getState().resetRoom()
             resetGame()
           }}>

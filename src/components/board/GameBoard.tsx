@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { RAT_RACE_SPACES, FAST_TRACK_SPACES } from '../../data/board'
+import { QUICK_BOARD_SPACES, QUICK_BOARD_SIZE } from '../../data/quickMode'
 import type { BoardSpace, Player } from '../../types'
 
 // Board layout: 24 spaces around perimeter, fast track ring in center
@@ -42,6 +43,7 @@ const SPACE_COLORS: Record<string, string> = {
   dream: '#78350f',
   fast_deal: '#1e3a8a',
   fast_market: '#78350f',
+  surprise: '#4c1d95',
 }
 
 const SPACE_ICONS: Record<string, string> = {
@@ -57,6 +59,7 @@ const SPACE_ICONS: Record<string, string> = {
   dream: '⭐',
   fast_deal: '🏢',
   fast_market: '📊',
+  surprise: '🎁',
 }
 
 function BoardCell({ space, players, isActive }: {
@@ -134,15 +137,21 @@ function BoardCell({ space, players, isActive }: {
 export function GameBoard() {
   const players = useGameStore((s) => s.players)
   const currentPlayerIndex = useGameStore((s) => s.currentPlayerIndex)
+  const gameMode = useGameStore((s) => s.gameMode)
   const currentPlayer = players[currentPlayerIndex]
+  const isQuick = gameMode === 'quick'
 
-  const ratRacePositions = useMemo(
-    () => computeRatRacePositions(24, BOARD_SIZE),
-    [],
+  const boardSpaces = isQuick ? QUICK_BOARD_SPACES : RAT_RACE_SPACES
+  const boardSize = isQuick ? QUICK_BOARD_SIZE : 24
+
+  const outerPositions = useMemo(
+    () => computeRatRacePositions(boardSize, BOARD_SIZE),
+    [boardSize],
   )
 
-  // Fast track: small ring inside
+  // Fast track: small ring inside (classic only)
   const fastTrackPositions = useMemo(() => {
+    if (isQuick) return []
     const count = 16
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 2 - Math.PI / 2
@@ -152,7 +161,7 @@ export function GameBoard() {
         y: CENTER_Y + r * Math.sin(angle),
       }
     })
-  }, [])
+  }, [isQuick])
 
   const ratRacePlayers = players.filter((p) => p.track === 'rat')
   const fastTrackPlayers = players.filter((p) => p.track === 'fast')
@@ -174,7 +183,7 @@ export function GameBoard() {
           height={BOARD_SIZE - 4}
           rx={14}
           fill="none"
-          stroke="rgba(99,102,241,0.3)"
+          stroke={isQuick ? 'rgba(34,197,94,0.3)' : 'rgba(99,102,241,0.3)'}
           strokeWidth={2}
         />
 
@@ -183,11 +192,11 @@ export function GameBoard() {
           x={CENTER_X}
           y={CENTER_Y - 20}
           textAnchor="middle"
-          fill="rgba(99,102,241,0.6)"
+          fill={isQuick ? 'rgba(34,197,94,0.6)' : 'rgba(99,102,241,0.6)'}
           fontSize={28}
           fontWeight="bold"
         >
-          💰
+          {isQuick ? '⚡' : '💰'}
         </text>
         <text
           x={CENTER_X}
@@ -197,44 +206,48 @@ export function GameBoard() {
           fontSize={12}
           fontWeight="bold"
         >
-          КРЫСИНЫЕ БЕГА
+          {isQuick ? 'БЫСТРАЯ ИГРА' : 'КРЫСИНЫЕ БЕГА'}
         </text>
-        <text
-          x={CENTER_X}
-          y={CENTER_Y + 30}
-          textAnchor="middle"
-          fill="rgba(148,163,184,0.3)"
-          fontSize={9}
-        >
-          Быстрый трек →
-        </text>
+        {!isQuick && (
+          <text
+            x={CENTER_X}
+            y={CENTER_Y + 30}
+            textAnchor="middle"
+            fill="rgba(148,163,184,0.3)"
+            fontSize={9}
+          >
+            Быстрый трек →
+          </text>
+        )}
 
-        {/* Rat race track path */}
+        {/* Track path */}
         <polyline
-          points={ratRacePositions.map((p) => `${p.x},${p.y}`).join(' ')}
+          points={outerPositions.map((p) => `${p.x},${p.y}`).join(' ')}
           fill="none"
-          stroke="rgba(99,102,241,0.2)"
+          stroke={isQuick ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.2)'}
           strokeWidth={2}
           strokeDasharray="4,4"
         />
 
-        {/* Fast track circle */}
-        <circle
-          cx={CENTER_X}
-          cy={CENTER_Y}
-          r={128}
-          fill="none"
-          stroke="rgba(245,158,11,0.2)"
-          strokeWidth={2}
-          strokeDasharray="6,4"
-        />
+        {/* Fast track circle (classic only) */}
+        {!isQuick && (
+          <circle
+            cx={CENTER_X}
+            cy={CENTER_Y}
+            r={128}
+            fill="none"
+            stroke="rgba(245,158,11,0.2)"
+            strokeWidth={2}
+            strokeDasharray="6,4"
+          />
+        )}
 
-        {/* Rat race spaces */}
-        {RAT_RACE_SPACES.map((space, i) => {
-          const pos = ratRacePositions[i]
+        {/* Outer track spaces */}
+        {boardSpaces.map((space, i) => {
+          const pos = outerPositions[i]
           const isCurrentPos = currentPlayer?.track === 'rat' && currentPlayer?.position === i
           return (
-            <g key={`rat-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
+            <g key={`outer-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
               <BoardCell
                 space={space}
                 players={ratRacePlayers}
@@ -244,8 +257,8 @@ export function GameBoard() {
           )
         })}
 
-        {/* Fast track spaces */}
-        {FAST_TRACK_SPACES.map((space, i) => {
+        {/* Fast track spaces (classic only) */}
+        {!isQuick && FAST_TRACK_SPACES.map((space, i) => {
           const pos = fastTrackPositions[i]
           const isCurrentPos = currentPlayer?.track === 'fast' && currentPlayer?.position === i
           return (

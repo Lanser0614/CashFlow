@@ -11,6 +11,7 @@ export type SpaceType =
   | 'dream'       // fast track only
   | 'fast_deal'   // fast track deals
   | 'fast_market' // fast track market
+  | 'surprise'    // quick mode only
 
 export interface BoardSpace {
   id: number

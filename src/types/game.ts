@@ -1,7 +1,9 @@
 import type { AnyCard } from './cards'
 import type { Player } from './player'
 
-export type GamePhase = 'setup' | 'playing' | 'won'
+export type GamePhase = 'mode_select' | 'setup' | 'playing' | 'won'
+
+export type GameMode = 'classic' | 'quick'
 
 export type TurnPhase =
   | 'roll'          // waiting for dice roll
@@ -26,6 +28,7 @@ export interface SetupPlayer {
 
 export interface GameState {
   phase: GamePhase
+  gameMode: GameMode
   players: Player[]
   currentPlayerIndex: number
   turnPhase: TurnPhase
@@ -44,4 +47,8 @@ export interface GameState {
   doodadDeck: string[]
   marketDeck: string[]
   turnNumber: number
+  // Quick mode specific
+  surpriseDeck: string[]
+  surpriseDeckIndex: number
+  extraTurnFlag: boolean   // for surprise "extra turn" effect
 }

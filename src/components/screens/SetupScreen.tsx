@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
 import { useRoomStore } from '../../store/roomStore'
 import { PROFESSIONS } from '../../data/professions'
+import { QUICK_PROFESSIONS } from '../../data/quickMode'
 import { formatCurrency } from '../../utils'
 import { computePlayerStats } from '../../utils/playerStats'
 import { TutorialScreen } from '../tutorial/TutorialScreen'
@@ -33,6 +34,10 @@ export function SetupScreen() {
     { name: 'Игрок 2', professionId: 'engineer' },
   ])
   const startGame = useGameStore((s) => s.startGame)
+  const gameMode = useGameStore((s) => s.gameMode)
+  const resetGame = useGameStore((s) => s.resetGame)
+  const isQuick = gameMode === 'quick'
+  const availableProfessions = isQuick ? QUICK_PROFESSIONS : PROFESSIONS
   const { user, isAuthenticated, logout } = useAuthStore()
 
   const handleCountSelect = (count: number) => {
@@ -40,7 +45,7 @@ export function SetupScreen() {
     setPlayers(
       Array.from({ length: count }, (_, i) => ({
         name: `Игрок ${i + 1}`,
-        professionId: PROFESSIONS[i % PROFESSIONS.length].id,
+        professionId: availableProfessions[i % availableProfessions.length].id,
       })),
     )
     setStep('players')
@@ -57,7 +62,7 @@ export function SetupScreen() {
   }
 
   const getMockStats = (profId: string) => {
-    const prof = PROFESSIONS.find((p) => p.id === profId)!
+    const prof = availableProfessions.find((p) => p.id === profId)!
     const mockPlayer = {
       statement: { ...prof.statement, realEstate: [], businesses: [], stocks: [], speculations: [] },
       babies: 0,
@@ -119,36 +124,38 @@ export function SetupScreen() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', delay: 0.1 }}
-            className="text-6xl mb-3"
+            className="text-5xl sm:text-6xl mb-3"
           >
             💰
           </motion.div>
-          <h1 className="text-4xl font-bold mb-2" style={{
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{
             background: 'linear-gradient(135deg, #f59e0b, #fcd34d)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>
             CASH FLOW 101
           </h1>
-          <p className="text-slate-400">Вырвись из крысиных бегов!</p>
+          <p className="text-slate-400">
+            {isQuick ? '⚡ Быстрая игра' : 'Вырвись из крысиных бегов!'}
+          </p>
         </div>
 
         {step === 'count' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="glass-panel p-8"
+            className="glass-panel p-5 sm:p-8"
           >
-            <h2 className="text-2xl font-bold text-center mb-6">Сколько игроков?</h2>
-            <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-center mb-6">Сколько игроков?</h2>
+            <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <motion.button
                   key={n}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleCountSelect(n)}
-                  className="aspect-square rounded-xl text-3xl font-bold flex items-center justify-center
-                    border-2 transition-all duration-200"
+                  className="aspect-square rounded-xl text-2xl sm:text-3xl font-bold flex items-center justify-center
+                    border-2 transition-all duration-200 min-h-[64px]"
                   style={{
                     borderColor: n === playerCount ? '#6366f1' : '#2d3154',
                     background: n === playerCount
@@ -160,8 +167,8 @@ export function SetupScreen() {
                 </motion.button>
               ))}
             </div>
-            {/* Online play button */}
-            {isAuthenticated && (
+            {/* Online play button (classic only) */}
+            {!isQuick && isAuthenticated && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -179,11 +186,19 @@ export function SetupScreen() {
             <div className="flex items-center justify-center gap-3 mt-4">
               <button
                 className="btn-ghost text-sm"
-                onClick={() => setShowTutorial(true)}
+                onClick={resetGame}
               >
-                📖 Как играть?
+                ← Назад
               </button>
-              {isAuthenticated && (
+              {!isQuick && (
+                <button
+                  className="btn-ghost text-sm"
+                  onClick={() => setShowTutorial(true)}
+                >
+                  📖 Как играть?
+                </button>
+              )}
+              {!isQuick && isAuthenticated && (
                 <button
                   className="btn-ghost text-sm"
                   onClick={() => setShowLoadModal(true)}
@@ -203,7 +218,7 @@ export function SetupScreen() {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {players.map((player, i) => {
-                const prof = PROFESSIONS.find((p) => p.id === player.professionId)!
+                const prof = availableProfessions.find((p) => p.id === player.professionId)!
                 const stats = getMockStats(player.professionId)
                 return (
                   <motion.div
@@ -211,7 +226,7 @@ export function SetupScreen() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="glass-panel p-5"
+                    className="glass-panel p-4 sm:p-5"
                   >
                     <div className="flex items-center gap-3 mb-4">
                       <div
@@ -233,10 +248,10 @@ export function SetupScreen() {
                       <select
                         value={player.professionId}
                         onChange={(e) => handlePlayerChange(i, 'professionId', e.target.value)}
-                        className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white cursor-pointer"
+                        className="w-full rounded-lg px-3 py-2.5 text-base sm:text-sm font-medium text-white cursor-pointer"
                         style={{ background: '#2d3154', border: '1px solid #3d4164' }}
                       >
-                        {PROFESSIONS.map((p) => (
+                        {availableProfessions.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.icon} {p.name}
                           </option>
@@ -268,12 +283,12 @@ export function SetupScreen() {
               })}
             </div>
 
-            <div className="flex gap-3 justify-center mt-6">
-              <button className="btn-ghost" onClick={() => setStep('count')}>
-                ← Назад
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6 px-2 sm:px-0">
+              <button className="btn-ghost order-2 sm:order-1" onClick={() => setStep('count')}>
+                ← Назад к выбору
               </button>
               <button
-                className="btn-primary text-lg px-10"
+                className="btn-primary text-lg px-10 w-full sm:w-auto order-1 sm:order-2"
                 onClick={handleStart}
               >
                 🎲 Начать игру!

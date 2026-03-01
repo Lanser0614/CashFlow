@@ -6,6 +6,7 @@ import { Dice } from './Dice'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
 import { RAT_RACE_SPACES, FAST_TRACK_SPACES } from '../../data/board'
+import { QUICK_BOARD_SPACES } from '../../data/quickMode'
 
 const END_TURN_TIMER_SECONDS = 5
 
@@ -16,6 +17,8 @@ export function TurnPanel() {
   const diceValues = useGameStore((s) => s.diceValues)
   const rollDiceAction = useGameStore((s) => s.rollDiceAction)
   const endTurn = useGameStore((s) => s.endTurn)
+  const gameMode = useGameStore((s) => s.gameMode)
+  const isQuick = gameMode === 'quick'
   const roomScreen = useRoomStore((s) => s.screen)
   const isOnline = roomScreen === 'game_online'
   const isMyTurn = useRoomStore((s) => s.isMyTurn)()
@@ -56,12 +59,13 @@ export function TurnPanel() {
   if (!player) return null
 
   const stats = computePlayerStats(player)
-  const spaces = player.track === 'rat' ? RAT_RACE_SPACES : FAST_TRACK_SPACES
+  const spaces = isQuick ? QUICK_BOARD_SPACES : (player.track === 'rat' ? RAT_RACE_SPACES : FAST_TRACK_SPACES)
   const currentSpace = spaces[player.position]
-  const diceCount = player.track === 'fast' || player.chariteTurnsLeft > 0 ? 2 : 1
+  const diceCount = isQuick ? 1 : (player.track === 'fast' || player.chariteTurnsLeft > 0 ? 2 : 1)
   const isRolling = turnPhase === 'moving'
 
   const getStatusText = () => {
+    if (isQuick) return null // No downsize/charity/fast track in quick mode
     if (player.downsized) return `⚠️ Даунсайз (ещё ${player.downsizeTurnsLeft} хода)`
     if (player.chariteTurnsLeft > 0) return `🙏 Благотворительность (ещё ${player.chariteTurnsLeft} ходов с 2 кубиками)`
     if (player.track === 'fast') return '🚀 БЫСТРЫЙ ТРЕК!'
@@ -200,8 +204,8 @@ export function TurnPanel() {
         )}
       </AnimatePresence>
 
-      {/* Passive income progress (rat race only) */}
-      {player.track === 'rat' && (
+      {/* Passive income progress */}
+      {(isQuick || player.track === 'rat') && (
         <div className="mt-1">
           <div className="flex justify-between text-xs text-slate-500 mb-1">
             <span>Пассивный доход</span>
@@ -223,7 +227,7 @@ export function TurnPanel() {
           </div>
           {stats.passiveIncome >= stats.totalExpenses && (
             <div className="text-xs text-green-400 text-center mt-1 font-medium">
-              🎉 Готов выйти из крысиных бегов!
+              {isQuick ? '🏆 Финансовая свобода достигнута!' : '🎉 Готов выйти из крысиных бегов!'}
             </div>
           )}
         </div>

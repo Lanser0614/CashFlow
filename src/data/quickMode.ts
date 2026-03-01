@@ -1,0 +1,312 @@
+import type { BoardSpace, SmallDeal, Doodad, MarketCard, SurpriseCard, ProfessionCard } from '../types'
+
+// ── Quick Mode Board: 12 spaces ──
+export const QUICK_BOARD_SIZE = 12
+
+export const QUICK_BOARD_SPACES: BoardSpace[] = [
+  { id: 0,  type: 'payday',   label: 'ЗАРПЛАТА',   color: '#16a34a', icon: '💰' },
+  { id: 1,  type: 'deal',     label: 'СДЕЛКА',      color: '#2563eb', icon: '🤝' },
+  { id: 2,  type: 'doodad',   label: 'РАСХОД',      color: '#dc2626', icon: '💸' },
+  { id: 3,  type: 'market',   label: 'РЫНОК',       color: '#d97706', icon: '📈' },
+  { id: 4,  type: 'payday',   label: 'ЗАРПЛАТА',   color: '#16a34a', icon: '💰' },
+  { id: 5,  type: 'deal',     label: 'СДЕЛКА',      color: '#2563eb', icon: '🤝' },
+  { id: 6,  type: 'surprise', label: 'СЮРПРИЗ',     color: '#7c3aed', icon: '🎁' },
+  { id: 7,  type: 'doodad',   label: 'РАСХОД',      color: '#dc2626', icon: '💸' },
+  { id: 8,  type: 'payday',   label: 'ЗАРПЛАТА',   color: '#16a34a', icon: '💰' },
+  { id: 9,  type: 'deal',     label: 'СДЕЛКА',      color: '#2563eb', icon: '🤝' },
+  { id: 10, type: 'market',   label: 'РЫНОК',       color: '#d97706', icon: '📈' },
+  { id: 11, type: 'surprise', label: 'СЮРПРИЗ',     color: '#7c3aed', icon: '🎁' },
+]
+
+// ── Quick Mode Professions (3 — reuse originals) ──
+export const QUICK_PROFESSIONS: ProfessionCard[] = [
+  {
+    id: 'teacher',
+    name: 'Учитель',
+    icon: '📚',
+    startingCash: 1092,
+    statement: {
+      salary: 3300,
+      taxes: 630,
+      mortgage: 500,
+      carLoan: 100,
+      creditCard: 50,
+      schoolLoan: 60,
+      otherExpenses: 610,
+      childExpenses: 140,
+      homeMortgageBalance: 47000,
+      carLoanBalance: 5000,
+      creditCardBalance: 2000,
+      schoolLoanBalance: 6000,
+    },
+  },
+  {
+    id: 'engineer',
+    name: 'Инженер',
+    icon: '⚙️',
+    startingCash: 2548,
+    statement: {
+      salary: 4900,
+      taxes: 950,
+      mortgage: 700,
+      carLoan: 100,
+      creditCard: 50,
+      schoolLoan: 60,
+      otherExpenses: 760,
+      childExpenses: 180,
+      homeMortgageBalance: 72000,
+      carLoanBalance: 5000,
+      creditCardBalance: 3000,
+      schoolLoanBalance: 6000,
+    },
+  },
+  {
+    id: 'nurse',
+    name: 'Медсестра',
+    icon: '💉',
+    startingCash: 1284,
+    statement: {
+      salary: 3400,
+      taxes: 640,
+      mortgage: 600,
+      carLoan: 100,
+      creditCard: 50,
+      schoolLoan: 60,
+      otherExpenses: 680,
+      childExpenses: 150,
+      homeMortgageBalance: 56000,
+      carLoanBalance: 5000,
+      creditCardBalance: 3000,
+      schoolLoanBalance: 6000,
+    },
+  },
+]
+
+// ── Quick Mode Deals (8 simple cards) ──
+export const QUICK_DEALS: SmallDeal[] = [
+  // Real Estate
+  {
+    id: 'qd_apartment_1',
+    type: 'small_deal',
+    title: 'Квартира под сдачу',
+    description: 'Купить квартиру под сдачу. Взнос $3,000, ипотека $27,000. Доход: +$200/мес.',
+    category: 'real_estate',
+    cost: 3000,
+    cashflow: 200,
+    liability: 27000,
+    speculationTag: 'apartment',
+  },
+  {
+    id: 'qd_duplex_1',
+    type: 'small_deal',
+    title: 'Дуплекс',
+    description: 'Купить дуплекс. Взнос $5,000, ипотека $45,000. Доход: +$300/мес.',
+    category: 'real_estate',
+    cost: 5000,
+    cashflow: 300,
+    liability: 45000,
+    speculationTag: 'duplex',
+  },
+  {
+    id: 'qd_house_1',
+    type: 'small_deal',
+    title: 'Дом под аренду',
+    description: 'Купить дом. Взнос $4,000, ипотека $36,000. Доход: +$250/мес.',
+    category: 'real_estate',
+    cost: 4000,
+    cashflow: 250,
+    liability: 36000,
+    speculationTag: 'rental_house',
+  },
+  {
+    id: 'qd_garage_1',
+    type: 'small_deal',
+    title: 'Гараж под сдачу',
+    description: 'Купить гараж. Взнос $1,500. Доход: +$100/мес.',
+    category: 'real_estate',
+    cost: 1500,
+    cashflow: 100,
+  },
+  // Stocks
+  {
+    id: 'qd_stock_alpha',
+    type: 'small_deal',
+    title: 'Акции ALPHA',
+    description: 'Купить 100 акций ALPHA по $2/акция.',
+    category: 'stock',
+    cost: 200,
+    cashflow: 0,
+    stockSymbol: 'ALPHA',
+    sharesPerLot: 100,
+    pricePerShare: 2,
+  },
+  {
+    id: 'qd_stock_beta',
+    type: 'small_deal',
+    title: 'Акции BETA',
+    description: 'Купить 100 акций BETA по $5/акция.',
+    category: 'stock',
+    cost: 500,
+    cashflow: 0,
+    stockSymbol: 'BETA',
+    sharesPerLot: 100,
+    pricePerShare: 5,
+  },
+  // Business
+  {
+    id: 'qd_vending_1',
+    type: 'small_deal',
+    title: 'Вендинговые аппараты',
+    description: 'Купить вендинговые аппараты за $2,000. Доход: +$150/мес.',
+    category: 'business',
+    cost: 2000,
+    cashflow: 150,
+  },
+  {
+    id: 'qd_online_shop',
+    type: 'small_deal',
+    title: 'Интернет-магазин',
+    description: 'Запустить интернет-магазин за $1,000. Доход: +$100/мес.',
+    category: 'business',
+    cost: 1000,
+    cashflow: 100,
+  },
+]
+
+// ── Quick Mode Doodads (6 cash-only) ──
+export const QUICK_DOODADS: Doodad[] = [
+  {
+    id: 'qdd_car_repair',
+    type: 'doodad',
+    title: 'Ремонт машины',
+    description: 'Машина сломалась. Заплатите $1,000.',
+    amount: 1000,
+    effect: 'cash',
+  },
+  {
+    id: 'qdd_medical',
+    type: 'doodad',
+    title: 'Визит к врачу',
+    description: 'Неожиданные медицинские расходы — $800.',
+    amount: 800,
+    effect: 'cash',
+  },
+  {
+    id: 'qdd_tax',
+    type: 'doodad',
+    title: 'Налоговый штраф',
+    description: 'Ошибка в декларации. Штраф $1,500.',
+    amount: 1500,
+    effect: 'cash',
+  },
+  {
+    id: 'qdd_phone',
+    type: 'doodad',
+    title: 'Новый телефон',
+    description: 'Купили новый смартфон. $600.',
+    amount: 600,
+    effect: 'cash',
+  },
+  {
+    id: 'qdd_vacation',
+    type: 'doodad',
+    title: 'Отпуск',
+    description: 'Поехали в отпуск. Заплатите $2,000.',
+    amount: 2000,
+    effect: 'cash',
+  },
+  {
+    id: 'qdd_speeding',
+    type: 'doodad',
+    title: 'Штраф',
+    description: 'Штраф за нарушение ПДД — $300.',
+    amount: 300,
+    effect: 'cash',
+  },
+]
+
+// ── Quick Mode Market Cards (4 stock_price only) ──
+export const QUICK_MARKETS: MarketCard[] = [
+  {
+    id: 'qmc_alpha_up',
+    type: 'market',
+    title: 'ALPHA растёт!',
+    description: 'Акции ALPHA торгуются по $10/акция. Отличная прибыль!',
+    effect: { kind: 'stock_price', symbol: 'ALPHA', price: 10 },
+    canSell: true,
+  },
+  {
+    id: 'qmc_beta_up',
+    type: 'market',
+    title: 'BETA взлетает!',
+    description: 'Акции BETA торгуются по $20/акция!',
+    effect: { kind: 'stock_price', symbol: 'BETA', price: 20 },
+    canSell: true,
+  },
+  {
+    id: 'qmc_alpha_boom',
+    type: 'market',
+    title: 'ALPHA бьёт рекорды!',
+    description: 'Акции ALPHA торгуются по $15/акция!',
+    effect: { kind: 'stock_price', symbol: 'ALPHA', price: 15 },
+    canSell: true,
+  },
+  {
+    id: 'qmc_beta_crash',
+    type: 'market',
+    title: 'BETA падает',
+    description: 'Акции BETA упали до $1/акция.',
+    effect: { kind: 'stock_price', symbol: 'BETA', price: 1 },
+    canSell: false,
+  },
+]
+
+// ── Quick Mode Surprise Cards (5) ──
+export const QUICK_SURPRISES: SurpriseCard[] = [
+  {
+    id: 'qs_bonus_1',
+    type: 'surprise',
+    title: 'Бонус на работе!',
+    description: 'Вы получили премию на работе. +$2,000 к кэшу!',
+    effect: { kind: 'bonus_cash', amount: 2000 },
+  },
+  {
+    id: 'qs_bonus_2',
+    type: 'surprise',
+    title: 'Наследство!',
+    description: 'Дальний родственник оставил вам $3,000!',
+    effect: { kind: 'bonus_cash', amount: 3000 },
+  },
+  {
+    id: 'qs_lose_1',
+    type: 'surprise',
+    title: 'Потоп!',
+    description: 'Затопило квартиру. Ремонт обошёлся в $1,500.',
+    effect: { kind: 'lose_cash', amount: 1500 },
+  },
+  {
+    id: 'qs_free_asset',
+    type: 'surprise',
+    title: 'Бесплатная квартира!',
+    description: 'Вы выиграли квартиру в лотерею! Она приносит $150/мес.',
+    effect: {
+      kind: 'free_asset',
+      deal: {
+        id: 'qs_free_apt',
+        type: 'small_deal',
+        title: 'Квартира (приз)',
+        description: 'Выигранная квартира.',
+        category: 'real_estate',
+        cost: 0,
+        cashflow: 150,
+      },
+    },
+  },
+  {
+    id: 'qs_extra_turn',
+    type: 'surprise',
+    title: 'Удачный день!',
+    description: 'Вам повезло! Бросайте кубик ещё раз!',
+    effect: { kind: 'extra_turn' },
+  },
+]

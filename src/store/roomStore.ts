@@ -139,7 +139,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     if (!room) return
     set({ error: null })
     try {
-      const res = await roomApi.startGame(room.code)
+      await roomApi.startGame(room.code)
 
       // Build players array from room players
       const roomPlayers = room.players

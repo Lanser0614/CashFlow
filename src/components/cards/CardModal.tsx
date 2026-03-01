@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useRoomStore } from '../../store/roomStore'
 import { formatCurrency } from '../../utils'
-import type { SmallDeal, BigDeal, Doodad, MarketCard } from '../../types'
+import type { SmallDeal, BigDeal, Doodad, MarketCard, SurpriseCard } from '../../types'
 
 const CARD_TIMER_SECONDS = 30
 
@@ -53,7 +53,7 @@ function DealCardContent({ deal, player, onBuy, onPass }: {
       <p className="text-slate-300 text-sm mb-4 leading-relaxed">{deal.description}</p>
 
       {/* Financial details */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
         <div className="rounded-lg p-3" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
           <div className="text-xs text-red-400 font-semibold">Цена / Взнос</div>
           <div className="text-white font-bold">{formatCurrency(deal.cost * lots)}</div>
@@ -86,12 +86,12 @@ function DealCardContent({ deal, player, onBuy, onPass }: {
           </div>
           <div className="flex items-center gap-3">
             <button
-              className="btn-ghost px-3 py-1 text-lg"
+              className="btn-ghost px-4 py-2.5 text-lg touch-target"
               onClick={() => setLots(Math.max(1, lots - 1))}
             >−</button>
             <span className="text-2xl font-bold w-8 text-center">{lots}</span>
             <button
-              className="btn-ghost px-3 py-1 text-lg"
+              className="btn-ghost px-4 py-2.5 text-lg touch-target"
               onClick={() => setLots(Math.min(maxLots, lots + 1))}
             >+</button>
             <span className="text-sm text-slate-400">
@@ -193,6 +193,59 @@ function DoodadCardContent({ card, player, onClose }: {
   )
 }
 
+function SurpriseCardContent({ card, onClose }: {
+  card: SurpriseCard
+  onClose: () => void
+}) {
+  const effectLabel = () => {
+    const eff = card.effect
+    if (eff.kind === 'bonus_cash') return { text: `+${formatCurrency(eff.amount)}`, color: '#22c55e', icon: '🎉' }
+    if (eff.kind === 'lose_cash') return { text: `−${formatCurrency(eff.amount)}`, color: '#ef4444', icon: '😬' }
+    if (eff.kind === 'free_asset') return { text: `Бесплатный актив: ${eff.deal.title}`, color: '#6366f1', icon: '🏠' }
+    if (eff.kind === 'extra_turn') return { text: 'Дополнительный ход!', color: '#f59e0b', icon: '🎲' }
+    if (eff.kind === 'skip_turn') return { text: 'Пропуск хода', color: '#94a3b8', icon: '⏭️' }
+    return { text: '', color: '#94a3b8', icon: '🎁' }
+  }
+
+  const { text, color, icon } = effectLabel()
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className="text-xs font-semibold px-2 py-1 rounded-full"
+          style={{
+            background: 'rgba(76, 29, 149, 0.2)',
+            color: '#c4b5fd',
+            border: '1px solid rgba(76,29,149,0.4)',
+          }}
+        >
+          🎁 СЮРПРИЗ
+        </span>
+      </div>
+
+      <p className="text-slate-300 text-sm mb-4 leading-relaxed">{card.description}</p>
+
+      <div
+        className="rounded-xl p-4 mb-5 text-center"
+        style={{ background: `${color}15`, border: `1px solid ${color}30` }}
+      >
+        <div className="text-3xl mb-2">{icon}</div>
+        <div className="text-xl font-bold" style={{ color }}>{text}</div>
+        {card.effect.kind === 'free_asset' && (
+          <div className="text-xs text-slate-400 mt-1">
+            +{formatCurrency(card.effect.deal.cashflow ?? 0)}/мес
+          </div>
+        )}
+      </div>
+
+      <button className="btn-primary w-full" onClick={onClose}>
+        ✨ Принять
+      </button>
+    </div>
+  )
+}
+
 function MarketCardContent({ card, player, onSell, onPass }: {
   card: MarketCard
   player: ReturnType<typeof useGameStore.getState>['players'][0]
@@ -274,7 +327,7 @@ function MarketCardContent({ card, player, onSell, onPass }: {
             {sellableAssets.map((asset) => (
               <div
                 key={asset.id}
-                className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg px-3 py-2.5 gap-2"
                 style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34,197,94,0.2)' }}
               >
                 <div>
@@ -285,7 +338,7 @@ function MarketCardContent({ card, player, onSell, onPass }: {
                   </div>
                 </div>
                 <button
-                  className="btn-success px-3 py-1.5 text-sm"
+                  className="btn-success px-3 py-1.5 text-sm w-full sm:w-auto"
                   onClick={() => onSell(asset.id, asset.type, asset.sellPrice)}
                 >
                   Продать
@@ -321,6 +374,7 @@ export function CardModal() {
   const buyDeal = useGameStore((s) => s.buyDeal)
   const passDeal = useGameStore((s) => s.passDeal)
   const closeDoodad = useGameStore((s) => s.closeDoodad)
+  const closeSurprise = useGameStore((s) => s.closeSurprise)
   const sellAsset = useGameStore((s) => s.sellAsset)
   const passMarket = useGameStore((s) => s.passMarket)
 
@@ -366,10 +420,12 @@ export function CardModal() {
       passMarket()
     } else if (currentCard?.type === 'doodad') {
       closeDoodad()
+    } else if (currentCard?.type === 'surprise') {
+      closeSurprise()
     } else {
       passDeal()
     }
-  }, [timeLeft, timerActive, passDeal, closeDoodad, passMarket])
+  }, [timeLeft, timerActive, passDeal, closeDoodad, closeSurprise, passMarket])
 
   if (!visible || !card || !player) return null
 
@@ -378,6 +434,7 @@ export function CardModal() {
     big_deal: card.title,
     doodad: card.title,
     market: card.title,
+    surprise: card.title,
   }
 
   const ICON_MAP: Record<string, string> = {
@@ -385,6 +442,7 @@ export function CardModal() {
     big_deal: '🏢',
     doodad: '💸',
     market: '📈',
+    surprise: '🎁',
   }
 
   return (
@@ -394,17 +452,17 @@ export function CardModal() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
         style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
       >
         <motion.div
           key="modal-content"
-          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          initial={{ opacity: 0, scale: 0.95, y: 40 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.8, y: 20 }}
+          exit={{ opacity: 0, scale: 0.95, y: 40 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="game-card w-full max-w-md p-6"
-          style={{ maxHeight: '90vh', overflowY: 'auto' }}
+          className="game-card w-full max-w-none lg:max-w-md p-4 lg:p-6 rounded-t-2xl rounded-b-none lg:rounded-xl"
+          style={{ maxHeight: '85vh', overflowY: 'auto' }}
         >
           {/* Auto-decline timer bar */}
           {timerActive && (
@@ -468,6 +526,12 @@ export function CardModal() {
               player={player}
               onSell={sellAsset}
               onPass={passMarket}
+            />
+          )}
+          {card.type === 'surprise' && (
+            <SurpriseCardContent
+              card={card as SurpriseCard}
+              onClose={closeSurprise}
             />
           )}
         </motion.div>

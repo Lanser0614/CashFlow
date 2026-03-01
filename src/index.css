@@ -142,3 +142,21 @@ body {
 .glow-gold {
   box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
 }
+
+/* Touch target utility */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Mobile button sizing */
+@media (max-width: 1023px) {
+  .btn-primary,
+  .btn-success,
+  .btn-danger {
+    min-height: 48px;
+  }
+  .btn-ghost {
+    min-height: 44px;
+  }
+}

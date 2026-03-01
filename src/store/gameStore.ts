@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import type {
   GameState,
+  GameMode,
   Player,
   SetupPlayer,
   SmallDeal,
   BigDeal,
   Doodad,
   MarketCard,
+  SurpriseCard,
   RealEstateAsset,
   BusinessAsset,
   StockHolding,
@@ -18,6 +20,10 @@ import { BIG_DEALS } from '../data/bigDeals'
 import { DOODADS } from '../data/doodads'
 import { MARKET_CARDS } from '../data/marketCards'
 import { RAT_RACE_SPACES, RAT_RACE_SIZE, FAST_TRACK_SIZE } from '../data/board'
+import {
+  QUICK_BOARD_SPACES, QUICK_BOARD_SIZE,
+  QUICK_DEALS, QUICK_DOODADS, QUICK_MARKETS, QUICK_SURPRISES,
+} from '../data/quickMode'
 import { shuffle, rollDice } from '../utils'
 import { computePlayerStats, canExitRatRace } from '../utils/playerStats'
 
@@ -54,6 +60,9 @@ function addLog(state: any, player: Player, message: string): any {
 }
 
 interface GameStore extends GameState {
+  // Mode selection
+  setGameMode: (mode: GameMode) => void
+
   // Setup
   startGame: (players: SetupPlayer[]) => void
   resetGame: () => void
@@ -65,6 +74,7 @@ interface GameStore extends GameState {
   buyDeal: (deal: SmallDeal | BigDeal, lots?: number) => void
   passDeal: () => void
   closeDoodad: () => void
+  closeSurprise: () => void
   sellAsset: (assetId: string, assetType: 'stock' | 'real_estate' | 'business' | 'speculation', sellPrice?: number) => void
   passMarket: () => void
   endTurn: () => void
@@ -77,7 +87,8 @@ interface GameStore extends GameState {
 }
 
 const INITIAL_STATE: Omit<GameState, never> = {
-  phase: 'setup',
+  phase: 'mode_select',
+  gameMode: 'classic',
   players: [],
   currentPlayerIndex: 0,
   turnPhase: 'roll',
@@ -95,6 +106,9 @@ const INITIAL_STATE: Omit<GameState, never> = {
   doodadDeck: [],
   marketDeck: [],
   turnNumber: 0,
+  surpriseDeck: [],
+  surpriseDeckIndex: 0,
+  extraTurnFlag: false,
 }
 
 function drawCard<T extends { id: string }>(
@@ -111,6 +125,10 @@ function drawCard<T extends { id: string }>(
 export const useGameStore = create<GameStore>()((set, get) => ({
   ...INITIAL_STATE,
 
+  setGameMode: (mode: GameMode) => {
+    set({ gameMode: mode, phase: 'setup' })
+  },
+
   getCurrentPlayer: () => {
     const state = get()
     return state.players[state.currentPlayerIndex]
@@ -122,8 +140,14 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   },
 
   startGame: (setupPlayers: SetupPlayer[]) => {
+    const state = get()
+    const isQuick = state.gameMode === 'quick'
+    const profList = isQuick ? QUICK_DEALS : SMALL_DEALS // just for type ref
+    void profList
+
     const players: Player[] = setupPlayers.map((sp, i) => {
-      const profession = PROFESSIONS.find((p) => p.id === sp.professionId)!
+      const allProfs = isQuick ? (PROFESSIONS) : PROFESSIONS
+      const profession = allProfs.find((p) => p.id === sp.professionId)!
       return {
         id: `player_${i}`,
         name: sp.name,
@@ -131,7 +155,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
         professionId: profession.id,
         professionName: profession.name,
         position: 0,
-        track: 'rat',
+        track: 'rat' as const,
         dreamPosition: DREAM_POSITIONS[i],
         cash: profession.startingCash,
         babies: 0,
@@ -149,25 +173,55 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       }
     })
 
-    set({
-      phase: 'playing',
-      players,
-      currentPlayerIndex: 0,
-      turnPhase: 'roll',
-      diceValues: [],
-      activeCard: null,
-      pendingMarketCard: null,
-      log: [],
-      winner: null,
-      smallDeckIndex: 0,
-      bigDeckIndex: 0,
-      doodadDeckIndex: 0,
-      marketDeckIndex: 0,
-      smallDeck: shuffle(SMALL_DEALS.map((c) => c.id)),
-      bigDeck: shuffle(BIG_DEALS.map((c) => c.id)),
-      doodadDeck: shuffle(DOODADS.map((c) => c.id)),
-      marketDeck: shuffle(MARKET_CARDS.map((c) => c.id)),
-    })
+    if (isQuick) {
+      set({
+        phase: 'playing',
+        players,
+        currentPlayerIndex: 0,
+        turnPhase: 'roll',
+        diceValues: [],
+        activeCard: null,
+        pendingMarketCard: null,
+        log: [],
+        winner: null,
+        smallDeckIndex: 0,
+        bigDeckIndex: 0,
+        doodadDeckIndex: 0,
+        marketDeckIndex: 0,
+        smallDeck: shuffle(QUICK_DEALS.map((c) => c.id)),
+        bigDeck: [],
+        doodadDeck: shuffle(QUICK_DOODADS.map((c) => c.id)),
+        marketDeck: shuffle(QUICK_MARKETS.map((c) => c.id)),
+        turnNumber: 0,
+        surpriseDeck: shuffle(QUICK_SURPRISES.map((c) => c.id)),
+        surpriseDeckIndex: 0,
+        extraTurnFlag: false,
+      })
+    } else {
+      set({
+        phase: 'playing',
+        players,
+        currentPlayerIndex: 0,
+        turnPhase: 'roll',
+        diceValues: [],
+        activeCard: null,
+        pendingMarketCard: null,
+        log: [],
+        winner: null,
+        smallDeckIndex: 0,
+        bigDeckIndex: 0,
+        doodadDeckIndex: 0,
+        marketDeckIndex: 0,
+        smallDeck: shuffle(SMALL_DEALS.map((c) => c.id)),
+        bigDeck: shuffle(BIG_DEALS.map((c) => c.id)),
+        doodadDeck: shuffle(DOODADS.map((c) => c.id)),
+        marketDeck: shuffle(MARKET_CARDS.map((c) => c.id)),
+        turnNumber: 0,
+        surpriseDeck: [],
+        surpriseDeckIndex: 0,
+        extraTurnFlag: false,
+      })
+    }
   },
 
   resetGame: () => set({ ...INITIAL_STATE }),
@@ -175,12 +229,13 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   rollDiceAction: () => {
     const state = get()
     const player = state.players[state.currentPlayerIndex]
+    const isQuick = state.gameMode === 'quick'
 
     // Can't roll if not in roll phase
     if (state.turnPhase !== 'roll') return
 
-    // Downsize: skip turn but pay expenses
-    if (player.downsized) {
+    // Downsize: skip turn but pay expenses (classic only)
+    if (!isQuick && player.downsized) {
       const expenses = computePlayerStats(player).totalExpenses
       const updatedPlayer: Player = {
         ...player,
@@ -197,8 +252,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       return
     }
 
-    const numDice =
-      player.track === 'fast' || player.chariteTurnsLeft > 0 ? 2 : 1
+    // Quick mode: always 1 die
+    const numDice = isQuick
+      ? 1
+      : (player.track === 'fast' || player.chariteTurnsLeft > 0 ? 2 : 1)
     const values = rollDice(numDice)
     const total = values.reduce((a, b) => a + b, 0)
 
@@ -216,14 +273,18 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const state = get()
     const player = state.players[state.currentPlayerIndex]
     const total = state.diceValues.reduce((a, b) => a + b, 0)
+    const isQuick = state.gameMode === 'quick'
 
-    const trackSize = player.track === 'rat' ? RAT_RACE_SIZE : FAST_TRACK_SIZE
+    const trackSize = isQuick
+      ? QUICK_BOARD_SIZE
+      : (player.track === 'rat' ? RAT_RACE_SIZE : FAST_TRACK_SIZE)
+    const boardSpaces = isQuick ? QUICK_BOARD_SPACES : RAT_RACE_SPACES
     const newPosition = (player.position + total) % trackSize
 
     let updatedPlayer: Player = { ...player, position: newPosition }
 
-    // Charity turns countdown
-    if (updatedPlayer.chariteTurnsLeft > 0) {
+    // Charity turns countdown (classic only)
+    if (!isQuick && updatedPlayer.chariteTurnsLeft > 0) {
       updatedPlayer = {
         ...updatedPlayer,
         chariteTurnsLeft: updatedPlayer.chariteTurnsLeft - 1,
@@ -232,10 +293,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
     // Count payday spaces PASSED (not including the landing space — handled by resolveSpace)
     let paydaysPassedCount = 0
-    if (player.track === 'rat') {
+    if (isQuick || player.track === 'rat') {
       for (let step = 1; step < total; step++) {
-        const checkPos = (player.position + step) % RAT_RACE_SIZE
-        if (RAT_RACE_SPACES[checkPos].type === 'payday') {
+        const checkPos = (player.position + step) % trackSize
+        if (boardSpaces[checkPos].type === 'payday') {
           paydaysPassedCount++
         }
       }
@@ -264,12 +325,80 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     }
 
     set(newState)
+
+    // Quick mode: check win after payday pass-through
+    if (isQuick && paydaysPassedCount > 0) {
+      const stats = computePlayerStats(updatedPlayer)
+      if (stats.passiveIncome >= stats.totalExpenses) {
+        set({ phase: 'won', winner: updatedPlayer })
+        return
+      }
+    }
+
     get().resolveSpace()
   },
 
   resolveSpace: () => {
     const state = get()
     const player = state.players[state.currentPlayerIndex]
+    const isQuick = state.gameMode === 'quick'
+
+    // ── Quick Mode resolution ──
+    if (isQuick) {
+      const space = QUICK_BOARD_SPACES[player.position]
+      if (!space) { set({ turnPhase: 'end_turn' }); return }
+
+      switch (space.type) {
+        case 'payday': {
+          const cf = computePlayerStats(player).monthlyCashFlow
+          const updatedPlayer = { ...player, cash: player.cash + cf }
+          const newPlayers = state.players.map((p) => p.id === player.id ? updatedPlayer : p)
+          let newState = { ...state, players: newPlayers }
+          newState = addLog(newState, updatedPlayer, `получил зарплату. +$${cf.toLocaleString()}`)
+          set({ ...newState, turnPhase: 'end_turn' })
+          // Check quick win
+          const stats = computePlayerStats(updatedPlayer)
+          if (stats.passiveIncome >= stats.totalExpenses) {
+            set({ phase: 'won', winner: updatedPlayer })
+          }
+          break
+        }
+
+        case 'deal': {
+          const [card, newIdx] = drawCard(state.smallDeck, state.smallDeckIndex, QUICK_DEALS)
+          const newState = addLog(state, player, `попал на Сделку`)
+          set({ ...newState, activeCard: card, smallDeckIndex: newIdx, turnPhase: 'card_shown' })
+          break
+        }
+
+        case 'doodad': {
+          const [card, newIdx] = drawCard(state.doodadDeck, state.doodadDeckIndex, QUICK_DOODADS)
+          const newState = addLog(state, player, `попал на Расход 😱`)
+          set({ ...newState, activeCard: card, doodadDeckIndex: newIdx, turnPhase: 'card_shown' })
+          break
+        }
+
+        case 'market': {
+          const [card, newIdx] = drawCard(state.marketDeck, state.marketDeckIndex, QUICK_MARKETS)
+          const newState = applyMarketCard({ ...state, marketDeckIndex: newIdx }, player, card)
+          set({ ...newState, activeCard: card, pendingMarketCard: card, turnPhase: 'market_sell' })
+          break
+        }
+
+        case 'surprise': {
+          const [card, newIdx] = drawCard(state.surpriseDeck, state.surpriseDeckIndex, QUICK_SURPRISES)
+          const newState = addLog(state, player, `попал на Сюрприз 🎁`)
+          set({ ...newState, activeCard: card, surpriseDeckIndex: newIdx, turnPhase: 'card_shown' })
+          break
+        }
+
+        default:
+          set({ turnPhase: 'end_turn' })
+      }
+      return
+    }
+
+    // ── Classic Mode resolution ──
     const spaces = player.track === 'rat' ? RAT_RACE_SPACES : []
     const space = player.track === 'rat' ? spaces[player.position] : null
 
@@ -544,8 +673,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       newState = addLog(newState, updatedPlayer, `купил "${deal.title}". Поток: +$${deal.cashflow}/мес`)
       set({ ...newState, activeCard: null, turnPhase: 'end_turn' })
 
-      // Check rat race exit
-      setTimeout(() => checkRatRaceExit(), 100)
+      // Check rat race exit or quick win
+      if (state.gameMode === 'quick') {
+        setTimeout(() => checkQuickWin(), 100)
+      } else {
+        setTimeout(() => checkRatRaceExit(), 100)
+      }
       return
     }
 
@@ -579,8 +712,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       newState = addLog(newState, updatedPlayer, `купил "${deal.title}". Поток: +$${deal.cashflow}/мес`)
       set({ ...newState, activeCard: null, turnPhase: 'end_turn' })
 
-      // Check rat race exit
-      setTimeout(() => checkRatRaceExit(), 100)
+      // Check rat race exit or quick win
+      if (state.gameMode === 'quick') {
+        setTimeout(() => checkQuickWin(), 100)
+      } else {
+        setTimeout(() => checkRatRaceExit(), 100)
+      }
       return
     }
 
@@ -629,6 +766,73 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       : `Дудад: ${card.title}${card.addLiability ? ` +$${card.addLiability}/мес к расходам` : ''}`
     newState = addLog(newState, updatedPlayer, msg)
     set({ ...newState, activeCard: null, turnPhase: 'end_turn' })
+  },
+
+  closeSurprise: () => {
+    const state = get()
+    const player = state.players[state.currentPlayerIndex]
+    const card = state.activeCard as SurpriseCard
+
+    if (!card || card.type !== 'surprise') {
+      set({ activeCard: null, turnPhase: 'end_turn' })
+      return
+    }
+
+    const eff = card.effect
+    let updatedPlayer = { ...player }
+    let msg = ''
+
+    if (eff.kind === 'bonus_cash') {
+      updatedPlayer = { ...updatedPlayer, cash: updatedPlayer.cash + eff.amount }
+      msg = `получил $${eff.amount.toLocaleString()}! (${card.title})`
+    } else if (eff.kind === 'lose_cash') {
+      updatedPlayer = { ...updatedPlayer, cash: Math.max(0, updatedPlayer.cash - eff.amount) }
+      msg = `потерял $${eff.amount.toLocaleString()}. (${card.title})`
+    } else if (eff.kind === 'free_asset') {
+      const freeDeal = eff.deal
+      const re: RealEstateAsset = {
+        id: `re_${Date.now()}`,
+        dealId: freeDeal.id,
+        name: freeDeal.title,
+        purchasePrice: 0,
+        downPayment: 0,
+        mortgage: 0,
+        monthlyMortgage: 0,
+        monthlyCashflow: freeDeal.cashflow ?? 0,
+      }
+      updatedPlayer = {
+        ...updatedPlayer,
+        statement: {
+          ...updatedPlayer.statement,
+          realEstate: [...updatedPlayer.statement.realEstate, re],
+        },
+      }
+      msg = `получил бесплатный актив: "${freeDeal.title}" (+$${freeDeal.cashflow}/мес)`
+    } else if (eff.kind === 'extra_turn') {
+      msg = `получил дополнительный ход! 🎉`
+      // Set extra turn flag
+      const newPlayers = state.players.map((p) => p.id === player.id ? updatedPlayer : p)
+      let newState = { ...state, players: newPlayers, extraTurnFlag: true }
+      newState = addLog(newState, updatedPlayer, msg)
+      set({ ...newState, activeCard: null, turnPhase: 'end_turn' })
+      return
+    } else if (eff.kind === 'skip_turn') {
+      msg = `пропускает следующий ход. (${card.title})`
+      // For simplicity: just end turn, no skip tracking in quick mode
+    }
+
+    const newPlayers = state.players.map((p) => p.id === player.id ? updatedPlayer : p)
+    let newState = { ...state, players: newPlayers }
+    if (msg) newState = addLog(newState, updatedPlayer, msg)
+    set({ ...newState, activeCard: null, turnPhase: 'end_turn' })
+
+    // Check quick win after free_asset
+    if (eff.kind === 'free_asset') {
+      const stats = computePlayerStats(updatedPlayer)
+      if (stats.passiveIncome >= stats.totalExpenses) {
+        set({ phase: 'won', winner: updatedPlayer })
+      }
+    }
   },
 
   sellAsset: (assetId: string, assetType: 'stock' | 'real_estate' | 'business' | 'speculation', sellPrice?: number) => {
@@ -715,6 +919,13 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   endTurn: () => {
     const state = get()
+
+    // Quick mode: extra turn flag — same player rolls again
+    if (state.extraTurnFlag) {
+      set({ extraTurnFlag: false, turnPhase: 'roll', diceValues: [], activeCard: null, pendingMarketCard: null })
+      return
+    }
+
     const nextIndex = (state.currentPlayerIndex + 1) % state.players.length
     const newTurn = nextIndex === 0 ? state.turnNumber + 1 : state.turnNumber
     set({ currentPlayerIndex: nextIndex, turnPhase: 'roll', diceValues: [], activeCard: null, pendingMarketCard: null, turnNumber: newTurn })
@@ -784,6 +995,28 @@ function applyMarketCard(state: GameState, _currentPlayer: Player, card: MarketC
   // interest_rate_cut, real_estate_boom, sell_speculation handled at sell time
 
   return { ...state, players: newPlayers }
+}
+
+// Helper: check if current player wins in quick mode
+function checkQuickWin() {
+  const state = useGameStore.getState()
+  if (state.gameMode !== 'quick') return
+  const player = state.players[state.currentPlayerIndex]
+  const stats = computePlayerStats(player)
+  if (stats.passiveIncome >= stats.totalExpenses) {
+    const logEntry = {
+      id: logIdCounter++,
+      playerName: player.name,
+      playerColor: player.color,
+      message: `🎉 ПОБЕДА! Пассивный доход покрывает расходы!`,
+      timestamp: Date.now(),
+    }
+    useGameStore.setState({
+      phase: 'won',
+      winner: player,
+      log: [logEntry, ...state.log],
+    })
+  }
 }
 
 // Helper: check if current player can exit rat race
