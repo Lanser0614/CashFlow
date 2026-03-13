@@ -1,23 +1,25 @@
 services:
   frontend:
     build:
-      context: .
-      dockerfile: docker/frontend/Dockerfile
+      context: ./apps/frontend
+      dockerfile: ../../docker/frontend/Dockerfile
     working_dir: /workspace
     command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: http://backend:8000
     ports:
       - "5173:5173"
     volumes:
-      - .:/workspace
+      - ./apps/frontend:/workspace
       - frontend_node_modules:/workspace/node_modules
     depends_on:
       - backend
 
   backend:
     build:
-      context: .
-      dockerfile: docker/backend/Dockerfile
-    working_dir: /workspace/backend
+      context: ./apps/backend
+      dockerfile: ../../docker/backend/Dockerfile
+    working_dir: /workspace
     command: >
       sh -lc "composer install --no-interaction --prefer-dist &&
       php artisan migrate --force &&
@@ -34,13 +36,20 @@ services:
       DB_USERNAME: cashflow
       DB_PASSWORD: cashflow
       LOG_CHANNEL: stderr
+      NATS_HOST: nats
+      NATS_PORT: 4222
+      JANUS_API_SECRET: cashflow-janus-secret
     ports:
       - "8000:8000"
     volumes:
-      - .:/workspace
-      - backend_vendor:/workspace/backend/vendor
+      - ./apps/backend:/workspace
+      - backend_vendor:/workspace/vendor
     depends_on:
       db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      janus:
         condition: service_healthy
 
   db:
@@ -61,7 +70,56 @@ services:
       retries: 20
       start_period: 10s
 
+  nats:
+    image: nats:2-alpine
+    command: ["-c", "/etc/nats/nats.conf"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "9222:9222"
+    volumes:
+      - ./nats_data:/data
+      - ./docker/nats/nats.conf:/etc/nats/nats.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  nats-ui:
+    image: mdawar/nats-dashboard
+    ports:
+      - "8282:80"
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  nats-box:
+    image: natsio/nats-box
+    command: sleep infinity
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  janus:
+    image: swmansion/janus-gateway:1.2.3-0
+    entrypoint: ["/usr/local/bin/janus"]
+    ports:
+      - "8188:8188"
+      - "10000-10200:10000-10200/udp"
+    volumes:
+      - ./docker/janus:/usr/local/etc/janus:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /proc/1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
 volumes:
   frontend_node_modules:
   backend_vendor:
   mysql_data:
+  nats_data:

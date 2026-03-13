@@ -1,0 +1,4 @@
+general: {
+	admin_key = "cashflow-videoroom-admin"
+	events = true
+}

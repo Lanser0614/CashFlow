@@ -23,24 +23,26 @@ dist-ssr
 *.sln
 *.sw?
 
+# Legacy
+pnpm-lock.yaml
 
-
-/backend/.phpunit.cache
-/backend//node_modules
-/backend/public/build
-/backend/public/hot
-/backend/public/storage
-/backend/storage/*.key
-/backend/vendor
-/backend/.env
-/backend/.env.backup
-/backend/.env.production
-/backend/.phpunit.result.cache
-/backend/Homestead.json
-/backend/Homestead.yaml
-/backend/auth.json
-/backend/npm-debug.log
-/backend/yarn-error.log
-/backend/.fleet
-/backend/.idea
-/backend/.vscode
+# Backend
+/apps/backend/.phpunit.cache
+/apps/backend/node_modules
+/apps/backend/public/build
+/apps/backend/public/hot
+/apps/backend/public/storage
+/apps/backend/storage/*.key
+/apps/backend/vendor
+/apps/backend/.env
+/apps/backend/.env.backup
+/apps/backend/.env.production
+/apps/backend/.phpunit.result.cache
+/apps/backend/Homestead.json
+/apps/backend/Homestead.yaml
+/apps/backend/auth.json
+/apps/backend/npm-debug.log
+/apps/backend/yarn-error.log
+/apps/backend/.fleet
+/apps/backend/.idea
+/apps/backend/.vscode
