@@ -5,14 +5,15 @@ import { useAuthStore } from '../../store/authStore'
 import { useRoomStore } from '../../store/roomStore'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
-import { gameApi } from '../../services/api'
+import { flushGameResultSync } from '../../services/gameResultSync'
 
 export function WinScreen() {
   const winner = useGameStore((s) => s.winner)
   const players = useGameStore((s) => s.players)
   const turnNumber = useGameStore((s) => s.turnNumber)
-  const resetGame = useGameStore((s) => s.resetGame)
   const gameMode = useGameStore((s) => s.gameMode)
+  const log = useGameStore((s) => s.log)
+  const resetGame = useGameStore((s) => s.resetGame)
   const isQuick = gameMode === 'quick'
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const resultPosted = useRef(false)
@@ -30,27 +31,8 @@ export function WinScreen() {
     if (!winner || !isAuthenticated || resultPosted.current) return
     resultPosted.current = true
 
-    const winnerStats = computePlayerStats(winner)
-    gameApi.storeResult({
-      winner_name: winner.name,
-      winner_profession: winner.professionName,
-      winner_cash: winner.cash,
-      winner_passive_income: winnerStats.passiveIncome,
-      winner_net_worth: winnerStats.netWorth,
-      player_count: players.length,
-      player_summaries: players.map((p) => {
-        const ps = computePlayerStats(p)
-        return {
-          name: p.name,
-          profession: p.professionName,
-          cash: p.cash,
-          passiveIncome: ps.passiveIncome,
-          track: p.track,
-        }
-      }),
-      total_turns: turnNumber,
-    }).catch(console.error)
-  }, [winner, isAuthenticated, players, turnNumber])
+    void flushGameResultSync()
+  }, [winner, isAuthenticated, players, turnNumber, gameMode, log])
 
   if (!winner) return null
 

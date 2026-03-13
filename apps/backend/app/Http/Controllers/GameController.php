@@ -77,31 +77,52 @@ class GameController extends Controller
     public function results(Request $request)
     {
         return GameResult::where('user_id', $request->user()->id)
-            ->orderByDesc('created_at')
+            ->orderByDesc('updated_at')
             ->get();
     }
 
     public function storeResult(Request $request)
     {
+        return $this->syncResult($request);
+    }
+
+    public function syncResult(Request $request)
+    {
         $request->validate([
+            'session_key' => 'required|string|max:100',
+            'game_mode' => 'required|string|in:classic,quick',
             'winner_name' => 'required|string',
             'winner_profession' => 'required|string',
             'winner_cash' => 'required|integer',
             'winner_passive_income' => 'required|integer',
             'winner_net_worth' => 'required|integer',
+            'player_name' => 'nullable|string',
+            'player_profession' => 'nullable|string',
+            'player_cash' => 'required|integer',
+            'player_passive_income' => 'required|integer',
+            'player_net_worth' => 'required|integer',
             'player_count' => 'required|integer',
-            'player_summaries' => 'required|array',
+            'did_win' => 'required|boolean',
+            'is_completed' => 'required|boolean',
+            'player_summaries' => 'present|array',
+            'journal' => 'present|array',
             'total_turns' => 'integer',
         ]);
 
-        $result = GameResult::create([
-            'user_id' => $request->user()->id,
-            ...$request->only([
+        $result = GameResult::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'session_key' => $request->string('session_key')->toString(),
+            ],
+            $request->only([
+                'game_mode',
                 'winner_name', 'winner_profession', 'winner_cash',
                 'winner_passive_income', 'winner_net_worth',
-                'player_count', 'player_summaries', 'total_turns',
-            ]),
-        ]);
+                'player_name', 'player_profession', 'player_cash',
+                'player_passive_income', 'player_net_worth',
+                'player_count', 'did_win', 'is_completed', 'player_summaries', 'journal', 'total_turns',
+            ])
+        );
 
         return response()->json($result, 201);
     }

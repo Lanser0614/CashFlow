@@ -9,6 +9,8 @@ import { GameScreen } from './components/screens/GameScreen'
 import { WinScreen } from './components/screens/WinScreen'
 import { LobbyScreen } from './components/screens/LobbyScreen'
 import { WaitingRoom } from './components/screens/WaitingRoom'
+import { ProfileScreen } from './components/screens/ProfileScreen'
+import { initializeGameResultSync } from './services/gameResultSync'
 import './index.css'
 
 function App() {
@@ -16,10 +18,15 @@ function App() {
   const { isAuthenticated, isGuest, isLoading, checkAuth } = useAuthStore()
   const roomScreen = useRoomStore((s) => s.screen)
   const joinRoom = useRoomStore((s) => s.joinRoom)
+  const restoreSession = useRoomStore((s) => s.restoreSession)
 
   useEffect(() => {
     checkAuth()
   }, [checkAuth])
+
+  useEffect(() => {
+    initializeGameResultSync()
+  }, [])
 
   // Handle join link: ?join=ABC123
   useEffect(() => {
@@ -31,6 +38,13 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [isAuthenticated, joinRoom])
+
+  // Restore room session after page refresh
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (roomScreen !== 'none') return
+    restoreSession()
+  }, [isAuthenticated, restoreSession])
 
   // Show loading while checking auth token
   if (isLoading) {
@@ -61,6 +75,7 @@ function App() {
 
   // Local game flow
   if (phase === 'mode_select') return <ModeSelectScreen />
+  if (phase === 'profile') return <ProfileScreen />
   if (phase === 'setup') return <SetupScreen />
   if (phase === 'won') return <WinScreen />
   return <GameScreen />

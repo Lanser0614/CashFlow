@@ -9,7 +9,7 @@ export function VideoControls({ roomCode }: VideoControlsProps) {
     isStreaming,
     isMuted,
     isVideoOff,
-    janusConnected,
+    liveKitConnected,
     error,
     startStreaming,
     stopStreaming,
@@ -17,7 +17,7 @@ export function VideoControls({ roomCode }: VideoControlsProps) {
     toggleVideo,
   } = useStreamStore()
 
-  if (!janusConnected) {
+  if (!liveKitConnected) {
     return null
   }
 
@@ -30,7 +30,7 @@ export function VideoControls({ roomCode }: VideoControlsProps) {
       {isStreaming ? (
         <>
           <button
-            onClick={toggleMute}
+            onClick={() => { void toggleMute() }}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
               isMuted
                 ? 'bg-red-600 hover:bg-red-700 text-white'
@@ -41,7 +41,7 @@ export function VideoControls({ roomCode }: VideoControlsProps) {
           </button>
 
           <button
-            onClick={toggleVideo}
+            onClick={() => { void toggleVideo() }}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
               isVideoOff
                 ? 'bg-red-600 hover:bg-red-700 text-white'

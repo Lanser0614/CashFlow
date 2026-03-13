@@ -7,6 +7,7 @@ services:
     command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: http://backend:8000
+      VITE_LIVEKIT_URL: ws://localhost:7880
     ports:
       - "5173:5173"
     volumes:
@@ -39,6 +40,10 @@ services:
       NATS_HOST: nats
       NATS_PORT: 4222
       JANUS_API_SECRET: cashflow-janus-secret
+      LIVEKIT_HTTP_URL: http://livekit:7880
+      LIVEKIT_WS_URL: ws://localhost:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
     ports:
       - "8000:8000"
     volumes:
@@ -117,6 +122,15 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    restart: unless-stopped
 
 volumes:
   frontend_node_modules:

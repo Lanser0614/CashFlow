@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoomStore } from '../../store/roomStore'
 import { useAuthStore } from '../../store/authStore'
-import { useStreamStore } from '../../store/streamStore'
 import { PROFESSIONS } from '../../data/professions'
 import { formatCurrency } from '../../utils'
 import { computePlayerStats } from '../../utils/playerStats'
@@ -16,8 +15,6 @@ const PLAYER_COLORS = [
 export function WaitingRoom() {
   const { room, error, getIsHost, getMyPlayer, startOnlineGame, leaveRoom, updateMyPlayer, toggleReady, startPollingRoom, stopPollingRoom } = useRoomStore()
   const userId = useAuthStore((s) => s.user?.id)
-  const userName = useAuthStore((s) => s.user?.name || 'Guest')
-  const { initializeJanus, janusConnected, cleanup: cleanupStream } = useStreamStore()
   const [copied, setCopied] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
 
@@ -26,14 +23,6 @@ export function WaitingRoom() {
     startPollingRoom()
     return () => stopPollingRoom()
   }, [startPollingRoom, stopPollingRoom])
-
-  // Initialize Janus when entering the waiting room
-  useEffect(() => {
-    if (room?.code && !janusConnected) {
-      initializeJanus(room.code, userName)
-    }
-    return () => cleanupStream()
-  }, [room?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!room) return null
 

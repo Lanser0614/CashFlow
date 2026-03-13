@@ -5,6 +5,7 @@ import { useRoomStore } from '../../store/roomStore'
 
 export function ModeSelectScreen() {
   const setGameMode = useGameStore((s) => s.setGameMode)
+  const openProfile = useGameStore((s) => s.openProfile)
   const { user, isAuthenticated, logout } = useAuthStore()
 
   return (
@@ -18,6 +19,12 @@ export function ModeSelectScreen() {
           <span className="text-xs text-slate-400">
             👤 {user.name}
           </span>
+          <button
+            onClick={openProfile}
+            className="text-xs text-indigo-300 hover:text-indigo-200 transition-colors px-2 py-1 rounded border border-indigo-500/20 hover:border-indigo-400/30"
+          >
+            Профиль
+          </button>
           <button
             onClick={logout}
             className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded border border-white/5 hover:border-white/10"

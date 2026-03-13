@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Game results
     Route::get('/results', [GameController::class, 'results']);
     Route::post('/results', [GameController::class, 'storeResult']);
+    Route::post('/results/sync', [GameController::class, 'syncResult']);
 
     // Online multiplayer rooms
     Route::post('/rooms', [RoomController::class, 'store']);
@@ -38,8 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rooms/{code}/action', [RoomController::class, 'submitAction']);
 
     // Video streaming
-    Route::post('/rooms/{code}/video-room', [StreamController::class, 'createVideoRoom']);
-    Route::get('/rooms/{code}/video-room', [StreamController::class, 'getVideoRoomInfo']);
+    Route::post('/rooms/{code}/livekit/token', [StreamController::class, 'createAccessToken']);
     Route::post('/rooms/{code}/streaming', [StreamController::class, 'updateStreamingStatus']);
-    Route::delete('/rooms/{code}/video-room', [StreamController::class, 'destroyVideoRoom']);
 });

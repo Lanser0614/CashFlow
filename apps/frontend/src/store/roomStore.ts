@@ -7,6 +7,15 @@ import type { GameState, SetupPlayer } from '../types'
 
 export type RoomScreen = 'none' | 'lobby' | 'waiting' | 'game_online'
 
+const ROOM_CODE_KEY = 'cashflow_room_code'
+
+function saveRoomCode(code: string) {
+  localStorage.setItem(ROOM_CODE_KEY, code)
+}
+function clearRoomCode() {
+  localStorage.removeItem(ROOM_CODE_KEY)
+}
+
 interface RoomState {
   // Room data
   room: RoomInfo | null
@@ -29,6 +38,7 @@ interface RoomState {
   toggleReady: () => Promise<void>
   startOnlineGame: () => Promise<void>
   refreshRoom: () => Promise<void>
+  restoreSession: () => Promise<void>
 
   // Polling
   startPollingRoom: () => void
@@ -46,6 +56,8 @@ interface RoomState {
 
 let roomPollTimer: ReturnType<typeof setInterval> | null = null
 let statePollTimer: ReturnType<typeof setInterval> | null = null
+let statePushInFlight = false
+let statePushQueued = false
 
 export const useRoomStore = create<RoomState>()((set, get) => ({
   room: null,
@@ -85,6 +97,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     try {
       const room = await roomApi.create(maxPlayers)
       set({ room, screen: 'waiting' })
+      saveRoomCode(room.code)
     } catch (err: any) {
       set({ error: err.message || 'Failed to create room' })
     }
@@ -95,6 +108,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     try {
       const room = await roomApi.join(code.toUpperCase())
       set({ room, screen: 'waiting' })
+      saveRoomCode(room.code)
     } catch (err: any) {
       set({ error: err.message || 'Failed to join room' })
     }
@@ -112,6 +126,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       // ignore
     }
     set({ room: null, screen: 'none', stateVersion: 0 })
+    clearRoomCode()
   },
 
   updateMyPlayer: async (data) => {
@@ -155,6 +170,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
 
       // Upload initial state to server
       set({ stateVersion: 0, screen: 'game_online' })
+      saveRoomCode(room.code)
 
       // Small delay so gameStore finishes initialization
       await new Promise((r) => setTimeout(r, 100))
@@ -177,6 +193,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       // If room status changed to 'playing', transition to game
       if (updated.status === 'playing' && get().screen === 'waiting') {
         set({ screen: 'game_online', stateVersion: 0 })
+        saveRoomCode(updated.code)
         get().stopPollingRoom()
         get().startPollingState()
       }
@@ -239,6 +256,11 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     const { room, stateVersion } = get()
     if (!room) return
 
+    if (statePushInFlight) {
+      statePushQueued = true
+      return
+    }
+
     const state = useGameStore.getState()
     const serializable: Record<string, unknown> = {
       phase: state.phase,
@@ -261,20 +283,57 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       turnNumber: state.turnNumber,
     }
 
+    statePushInFlight = true
+
     try {
       const newVersion = stateVersion + 1
       await roomApi.submitAction(room.code, serializable, newVersion)
       set({ stateVersion: newVersion })
     } catch (err: any) {
       console.error('Failed to push state:', err.message)
-      // On version conflict, refresh state from server
-      if (err.message?.includes('409') || err.message?.includes('conflict')) {
+      // On turn/version drift, refresh from server and continue from canonical state.
+      if (
+        err.message?.includes('409') ||
+        err.message?.includes('conflict') ||
+        err.message?.includes('403') ||
+        err.message?.toLowerCase?.().includes('not your turn')
+      ) {
         const data = await roomApi.getState(room.code, 0)
         if (data) {
           useGameStore.getState().syncFromServer(data.game_state as unknown as GameState)
           set({ stateVersion: data.state_version })
         }
       }
+    } finally {
+      statePushInFlight = false
+
+      if (statePushQueued) {
+        statePushQueued = false
+        void get().pushStateToServer()
+      }
+    }
+  },
+
+  restoreSession: async () => {
+    const code = localStorage.getItem(ROOM_CODE_KEY)
+    if (!code) return
+
+    try {
+      const room = await roomApi.show(code)
+
+      if (room.status === 'playing') {
+        set({ room, screen: 'game_online', stateVersion: 0 })
+        get().startPollingState()
+      } else if (room.status === 'waiting') {
+        set({ room, screen: 'waiting' })
+        get().startPollingRoom()
+      } else {
+        // finished or unknown
+        clearRoomCode()
+      }
+    } catch {
+      // Room not found or expired
+      clearRoomCode()
     }
   },
 
@@ -282,6 +341,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     get().stopPollingRoom()
     get().stopPollingState()
     set({ room: null, screen: 'none', stateVersion: 0, error: null })
+    clearRoomCode()
   },
 
   clearError: () => set({ error: null }),

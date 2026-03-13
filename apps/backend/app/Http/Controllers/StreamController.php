@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\GameRoom;
+use App\Models\GameRoomPlayer;
 use App\Models\RoomParticipant;
-use App\Services\JanusService;
+use App\Services\LiveKitTokenService;
 use App\Services\NatsPublisher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,63 +13,29 @@ use Illuminate\Http\Request;
 class StreamController extends Controller
 {
     public function __construct(
-        private JanusService $janus,
+        private LiveKitTokenService $liveKit,
         private NatsPublisher $nats,
     ) {
     }
 
     /**
-     * Create a Janus VideoRoom for the game room.
+     * Issue a LiveKit access token for the authenticated room participant.
      */
-    public function createVideoRoom(Request $request, string $code): JsonResponse
+    public function createAccessToken(Request $request, string $code): JsonResponse
     {
         $user = $request->user();
-        $room = GameRoom::where('code', $code)->firstOrFail();
+        $room = GameRoom::where('code', $code)->with('players')->firstOrFail();
+        $player = GameRoomPlayer::where('game_room_id', $room->id)
+            ->where('user_id', $user->id)
+            ->first();
 
-        if ($room->host_user_id !== $user->id) {
-            return response()->json(['message' => 'Only host can create video room'], 403);
+        if (!$player) {
+            return response()->json(['message' => 'You are not a participant of this room'], 403);
         }
 
-        if ($room->janus_room_id) {
-            return response()->json([
-                'janus_room_id' => $room->janus_room_id,
-            ]);
-        }
-
-        $janusRoomId = $this->janus->createRoom($room->id);
-
-        $room->update(['janus_room_id' => $janusRoomId]);
-
-        $this->nats->roomEvent($code, 'room_created', [
-            'janus_room_id' => $janusRoomId,
-        ]);
-
-        return response()->json([
-            'janus_room_id' => $janusRoomId,
-        ], 201);
-    }
-
-    /**
-     * Get Janus VideoRoom info for frontend connection.
-     */
-    public function getVideoRoomInfo(string $code): JsonResponse
-    {
-        $room = GameRoom::where('code', $code)->firstOrFail();
-
-        // Auto-assign janus_room_id if not set (deterministic, no external call)
-        if (!$room->janus_room_id) {
-            $room->update(['janus_room_id' => $this->janus->createRoom($room->id)]);
-            $room->refresh();
-        }
-
-        $participants = RoomParticipant::where('room_id', $room->id)
-            ->whereNull('left_at')
-            ->get(['user_id', 'is_streaming', 'role']);
-
-        return response()->json([
-            'janus_room_id' => $room->janus_room_id,
-            'participants' => $participants,
-        ]);
+        return response()->json(
+            $this->liveKit->issueRoomToken($room, $user, $player->player_name ?: $user->name)
+        );
     }
 
     /**
@@ -99,32 +66,5 @@ class StreamController extends Controller
         ]);
 
         return response()->json($participant);
-    }
-
-    /**
-     * Destroy Janus VideoRoom.
-     */
-    public function destroyVideoRoom(Request $request, string $code): JsonResponse
-    {
-        $user = $request->user();
-        $room = GameRoom::where('code', $code)->firstOrFail();
-
-        if ($room->host_user_id !== $user->id) {
-            return response()->json(['message' => 'Only host can destroy video room'], 403);
-        }
-
-        if ($room->janus_room_id) {
-            try {
-                $this->janus->destroyRoom($room->janus_room_id);
-            } catch (\Throwable $e) {
-                // Room may not exist in Janus anymore, that's ok
-            }
-
-            $room->update(['janus_room_id' => null]);
-
-            $this->nats->roomEvent($code, 'room_destroyed', []);
-        }
-
-        return response()->json(['message' => 'Video room destroyed']);
     }
 }

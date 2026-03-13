@@ -7,7 +7,17 @@ interface VideoGridProps {
 }
 
 export function VideoGrid({ isCompact, roomCode }: VideoGridProps) {
-  const { localStream, remoteStreams, isStreaming, isMuted, isVideoOff, janusConnected, startStreaming, error } = useStreamStore()
+  const {
+    localStream,
+    remoteStreams,
+    isStreaming,
+    isMuted,
+    isVideoOff,
+    liveKitConnected,
+    initializeLiveKit,
+    startStreaming,
+    error,
+  } = useStreamStore()
 
   const totalStreams = (isStreaming ? 1 : 0) + remoteStreams.length
 
@@ -16,26 +26,38 @@ export function VideoGrid({ isCompact, roomCode }: VideoGridProps) {
       <div className="flex flex-col items-center justify-center p-4 gap-3">
         <span className="text-slate-500 text-sm">Нет активных видеопотоков</span>
         {roomCode && (
-          <button
-            onClick={() => {
-              if (janusConnected) {
-                startStreaming(roomCode)
-              }
-            }}
-            disabled={!janusConnected}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              background: janusConnected ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'rgba(99,102,241,0.2)',
-              color: janusConnected ? 'white' : '#6366f1',
-              opacity: janusConnected ? 1 : 0.5,
-            }}
-          >
-            📹 Начать стрим
-          </button>
+          liveKitConnected ? (
+            <button
+              onClick={() => {
+                void startStreaming(roomCode)
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                color: 'white',
+              }}
+            >
+              📹 Начать стрим
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                void initializeLiveKit(roomCode)
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                background: 'rgba(99,102,241,0.2)',
+                color: '#6366f1',
+                border: '1px solid rgba(99,102,241,0.3)',
+              }}
+            >
+              Подключить видео
+            </button>
+          )
         )}
-        {!janusConnected && roomCode && (
+        {!liveKitConnected && roomCode && (
           <span className="text-slate-600 text-xs">
-            {error ? `Ошибка: ${error}` : 'Подключение к серверу...'}
+            {error ? `Ошибка: ${error}` : 'Подключение будет выполнено после клика'}
           </span>
         )}
       </div>
@@ -58,7 +80,7 @@ export function VideoGrid({ isCompact, roomCode }: VideoGridProps) {
       )}
       {remoteStreams.map((remote) => (
         <VideoTile
-          key={remote.feedId}
+          key={remote.participantIdentity}
           stream={remote.stream}
           playerName={remote.displayName}
         />

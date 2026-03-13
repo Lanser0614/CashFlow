@@ -16,7 +16,6 @@ import { MobileBottomBar } from '../mobile/MobileBottomBar'
 import { MobileDrawer } from '../mobile/MobileDrawer'
 import { VideoGrid } from '../video/VideoGrid'
 import { VideoControls } from '../video/VideoControls'
-import { useStreamStore } from '../../store/streamStore'
 
 type Panel = 'players' | 'log' | 'video'
 type ModalState = null | 'save' | 'load'
@@ -48,17 +47,6 @@ export function GameScreen() {
       unsub()
     }
   }, [isOnline])
-
-  // Initialize Janus for video in online mode
-  useEffect(() => {
-    if (!isOnline || !room?.code) return
-    const { janusConnected, initializeJanus } = useStreamStore.getState()
-    if (!janusConnected) {
-      const playerName = currentPlayer?.name || 'Player'
-      initializeJanus(room.code, playerName)
-    }
-    return () => useStreamStore.getState().cleanup()
-  }, [isOnline, room?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleExit = () => {
     if (isOnline) {

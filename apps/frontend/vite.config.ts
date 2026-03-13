@@ -12,16 +12,6 @@ export default defineConfig({
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
-      '/janus': {
-        target: 'http://localhost:8088',
-        changeOrigin: true,
-      },
-      '/janus-ws': {
-        target: 'ws://localhost:8188',
-        ws: true,
-        changeOrigin: true,
-        rewrite: (path: string) => path.replace(/^\/janus-ws/, ''),
-      },
     },
   },
 })

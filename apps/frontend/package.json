@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "framer-motion": "^12.34.3",
-    "janus-gateway": "^1.4.0",
+    "livekit-client": "^2.17.3",
     "nats.ws": "^1.30.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

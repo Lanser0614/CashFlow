@@ -1,7 +1,7 @@
 import type { AnyCard } from './cards'
 import type { Player } from './player'
 
-export type GamePhase = 'mode_select' | 'setup' | 'playing' | 'won'
+export type GamePhase = 'mode_select' | 'profile' | 'setup' | 'playing' | 'won'
 
 export type GameMode = 'classic' | 'quick'
 

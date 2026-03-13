@@ -22,6 +22,88 @@ class RoomController extends Controller
         '#6366f1', '#f59e0b', '#ef4444', '#22c55e', '#ec4899', '#14b8a6',
     ];
 
+    private function nextLogId(array $log): int
+    {
+        $maxId = collect($log)
+            ->pluck('id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->max();
+
+        return ($maxId ?? -1) + 1;
+    }
+
+    private function syncActiveGameAfterPlayerLeave(GameRoom $room, GameRoomPlayer $player): void
+    {
+        $gameState = $room->game_state;
+        if (!is_array($gameState) || !isset($gameState['players']) || !is_array($gameState['players'])) {
+            return;
+        }
+
+        $leavingIndex = (int) $player->player_index;
+        $players = array_values($gameState['players']);
+
+        if (!array_key_exists($leavingIndex, $players)) {
+            return;
+        }
+
+        array_splice($players, $leavingIndex, 1);
+        $gameState['players'] = $players;
+
+        $log = $gameState['log'] ?? [];
+        if (!is_array($log)) {
+            $log = [];
+        }
+
+        array_unshift($log, [
+            'id' => $this->nextLogId($log),
+            'playerName' => $player->player_name,
+            'playerColor' => $player->color,
+            'message' => 'покинул комнату',
+            'timestamp' => now()->getTimestampMs(),
+        ]);
+        $gameState['log'] = array_slice($log, 0, 100);
+
+        $remainingCount = count($players);
+
+        if ($remainingCount === 0) {
+            $room->update([
+                'game_state' => $gameState,
+                'state_version' => $room->state_version + 1,
+                'status' => 'finished',
+            ]);
+            return;
+        }
+
+        $currentIndex = (int) ($gameState['currentPlayerIndex'] ?? 0);
+
+        if ($currentIndex > $leavingIndex) {
+            $gameState['currentPlayerIndex'] = $currentIndex - 1;
+        } elseif ($currentIndex === $leavingIndex) {
+            $gameState['currentPlayerIndex'] = $leavingIndex % $remainingCount;
+            $gameState['turnPhase'] = 'roll';
+            $gameState['diceValues'] = [];
+            $gameState['activeCard'] = null;
+            $gameState['pendingMarketCard'] = null;
+            $gameState['extraTurnFlag'] = false;
+        }
+
+        $newStatus = 'playing';
+        if ($remainingCount === 1) {
+            $gameState['phase'] = 'won';
+            $gameState['winner'] = $players[0];
+            $gameState['currentPlayerIndex'] = 0;
+            $gameState['turnPhase'] = 'end_turn';
+            $newStatus = 'finished';
+        }
+
+        $room->update([
+            'game_state' => $gameState,
+            'state_version' => $room->state_version + 1,
+            'status' => $newStatus,
+        ]);
+    }
+
     /**
      * Create a new room.
      */
@@ -97,7 +179,7 @@ class RoomController extends Controller
             'color' => self::PLAYER_COLORS[$nextIndex % count(self::PLAYER_COLORS)],
         ]);
 
-        $room->load('players');
+        $room = $room->fresh(['players']);
 
         return response()->json($room);
     }
@@ -110,14 +192,12 @@ class RoomController extends Controller
         $user = $request->user();
         $room = GameRoom::where('code', $code)->with('players')->firstOrFail();
 
-        if ($room->status !== 'waiting') {
-            return response()->json(['message' => 'Cannot leave during game'], 422);
-        }
-
         $player = $room->players->where('user_id', $user->id)->first();
         if (!$player) {
             return response()->json(['message' => 'Not in room'], 422);
         }
+
+        $wasPlaying = $room->status === 'playing';
 
         $player->delete();
 
@@ -149,18 +229,30 @@ class RoomController extends Controller
             }
         }
 
-        // Reindex remaining players
+        // Reindex remaining players. During active games we preserve colors and
+        // update the persisted game_state so currentPlayerIndex stays valid.
         $remaining = GameRoomPlayer::where('game_room_id', $room->id)
             ->orderBy('player_index')
             ->get();
-        foreach ($remaining as $i => $p) {
-            $p->update([
-                'player_index' => $i,
-                'color' => self::PLAYER_COLORS[$i % count(self::PLAYER_COLORS)],
-            ]);
+
+        if ($wasPlaying) {
+            foreach ($remaining as $i => $p) {
+                $p->update([
+                    'player_index' => $i,
+                ]);
+            }
+
+            $this->syncActiveGameAfterPlayerLeave($room->fresh(), $player);
+        } else {
+            foreach ($remaining as $i => $p) {
+                $p->update([
+                    'player_index' => $i,
+                    'color' => self::PLAYER_COLORS[$i % count(self::PLAYER_COLORS)],
+                ]);
+            }
         }
 
-        $room->load('players');
+        $room = $room->fresh(['players']);
 
         return response()->json($room);
     }

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\JanusService;
+use App\Services\LiveKitTokenService;
 use App\Services\NatsPublisher;
 use Basis\Nats\Client;
 use Basis\Nats\Configuration;
@@ -26,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(NatsPublisher::class);
         $this->app->singleton(JanusService::class);
+        $this->app->singleton(LiveKitTokenService::class);
     }
 
     /**

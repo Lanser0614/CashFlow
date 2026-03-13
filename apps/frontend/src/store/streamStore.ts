@@ -1,11 +1,9 @@
 import { create } from 'zustand'
-import { janusVideoRoom } from '../services/janusService'
-import { subscribeToRoom, closeNatsConnection } from '../services/natsClient'
+import { Room, RoomEvent } from 'livekit-client'
 import { roomApi } from '../services/api'
-import type { Subscription } from 'nats.ws'
 
 interface RemoteStream {
-  feedId: number
+  participantIdentity: string
   displayName: string
   stream: MediaStream
 }
@@ -16,17 +14,65 @@ interface StreamState {
   isVideoOff: boolean
   localStream: MediaStream | null
   remoteStreams: RemoteStream[]
-  janusRoomId: number | null
-  janusConnected: boolean
+  liveKitRoomName: string | null
+  connectedRoomCode: string | null
+  liveKitConnected: boolean
   error: string | null
-  natsSubscription: Subscription | null
 
-  initializeJanus: (roomCode: string, displayName: string) => Promise<void>
+  initializeLiveKit: (roomCode: string) => Promise<void>
   startStreaming: (roomCode: string) => Promise<void>
   stopStreaming: (roomCode: string) => Promise<void>
-  toggleMute: () => void
-  toggleVideo: () => void
+  toggleMute: () => Promise<void>
+  toggleVideo: () => Promise<void>
   cleanup: () => void
+}
+
+type ParticipantWithTracks = {
+  identity: string
+  name?: string
+  trackPublications: Map<string, { track?: { mediaStreamTrack?: MediaStreamTrack | null } | null }>
+}
+
+let liveKitRoom: Room | null = null
+const remoteStreamsByIdentity = new Map<string, RemoteStream>()
+let connectGeneration = 0
+
+function collectTracks(participant: ParticipantWithTracks): MediaStreamTrack[] {
+  return Array.from(participant.trackPublications.values())
+    .map((publication) => publication.track?.mediaStreamTrack ?? null)
+    .filter((track): track is MediaStreamTrack => track !== null)
+}
+
+function syncRemoteParticipant(
+  participant: ParticipantWithTracks,
+  set: (partial: Partial<StreamState> | ((state: StreamState) => Partial<StreamState>)) => void,
+): void {
+  const tracks = collectTracks(participant)
+
+  if (tracks.length === 0) {
+    remoteStreamsByIdentity.delete(participant.identity)
+  } else {
+    remoteStreamsByIdentity.set(participant.identity, {
+      participantIdentity: participant.identity,
+      displayName: participant.name || participant.identity,
+      stream: new MediaStream(tracks),
+    })
+  }
+
+  set({ remoteStreams: Array.from(remoteStreamsByIdentity.values()) })
+}
+
+function syncLocalStream(
+  set: (partial: Partial<StreamState> | ((state: StreamState) => Partial<StreamState>)) => void,
+): void {
+  if (!liveKitRoom) {
+    set({ localStream: null })
+    return
+  }
+
+  const localParticipant = liveKitRoom.localParticipant as ParticipantWithTracks
+  const tracks = collectTracks(localParticipant)
+  set({ localStream: tracks.length > 0 ? new MediaStream(tracks) : null })
 }
 
 export const useStreamStore = create<StreamState>((set, get) => ({
@@ -35,81 +81,122 @@ export const useStreamStore = create<StreamState>((set, get) => ({
   isVideoOff: false,
   localStream: null,
   remoteStreams: [],
-  janusRoomId: null,
-  janusConnected: false,
+  liveKitRoomName: null,
+  connectedRoomCode: null,
+  liveKitConnected: false,
   error: null,
-  natsSubscription: null,
 
-  initializeJanus: async (roomCode: string, displayName: string) => {
+  initializeLiveKit: async (roomCode: string) => {
+    if (get().liveKitConnected && get().connectedRoomCode === roomCode && liveKitRoom) {
+      return
+    }
+
     try {
-      console.log('[Stream] Fetching video room info for', roomCode)
-      const info = await roomApi.getVideoRoom(roomCode)
-      if (!info?.janus_room_id) {
-        console.error('[Stream] No janus_room_id in response', info)
-        set({ error: 'No video room available' })
+      get().cleanup()
+      const generation = connectGeneration
+
+      const access = await roomApi.getLiveKitToken(roomCode)
+      const room = new Room()
+
+      room.on(RoomEvent.TrackSubscribed, (_track, _publication, participant) => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        syncRemoteParticipant(participant as unknown as ParticipantWithTracks, set)
+      })
+
+      room.on(RoomEvent.TrackUnsubscribed, (_track, _publication, participant) => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        syncRemoteParticipant(participant as unknown as ParticipantWithTracks, set)
+      })
+
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        remoteStreamsByIdentity.delete(participant.identity)
+        set({ remoteStreams: Array.from(remoteStreamsByIdentity.values()) })
+      })
+
+      room.on(RoomEvent.LocalTrackPublished, () => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        syncLocalStream(set)
+      })
+
+      room.on(RoomEvent.LocalTrackUnpublished, () => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        syncLocalStream(set)
+      })
+
+      room.on(RoomEvent.MediaDevicesError, (error) => {
+        if (liveKitRoom !== room) {
+          return
+        }
+        set({ error: error.message })
+      })
+
+      room.on(RoomEvent.Disconnected, () => {
+        if (liveKitRoom === room) {
+          liveKitRoom = null
+          remoteStreamsByIdentity.clear()
+          set({
+            isStreaming: false,
+            isMuted: false,
+            isVideoOff: false,
+            localStream: null,
+            remoteStreams: [],
+            liveKitRoomName: null,
+            connectedRoomCode: null,
+            liveKitConnected: false,
+          })
+        }
+      })
+
+      await room.connect(access.ws_url, access.token)
+
+      if (generation !== connectGeneration) {
+        room.disconnect()
         return
       }
 
-      set({ janusRoomId: info.janus_room_id })
-      console.log('[Stream] Got janus_room_id:', info.janus_room_id)
+      liveKitRoom = room
 
-      const wsHost = window.location.hostname || 'localhost'
-      const server = `ws://${wsHost}:8188`
-
-      console.log('[Stream] Connecting to Janus at', server)
-      await janusVideoRoom.connect({
-        server,
-        roomId: info.janus_room_id,
-        displayName,
-        onLocalStream: (stream) => {
-          set({ localStream: stream })
-        },
-        onRemoteStream: (feedId, feedDisplayName, stream) => {
-          set((state) => ({
-            remoteStreams: [
-              ...state.remoteStreams.filter((r) => r.feedId !== feedId),
-              { feedId, displayName: feedDisplayName, stream },
-            ],
-          }))
-        },
-        onRemoteStreamRemoved: (feedId) => {
-          set((state) => ({
-            remoteStreams: state.remoteStreams.filter((r) => r.feedId !== feedId),
-          }))
-        },
-        onError: (error) => {
-          console.error('[Stream] Janus error:', error)
-          set({ error })
-        },
-        onCleanup: () => {
-          set({ localStream: null })
-        },
+      room.remoteParticipants.forEach((participant) => {
+        syncRemoteParticipant(participant as unknown as ParticipantWithTracks, set)
       })
 
-      console.log('[Stream] Janus connected successfully')
-      set({ janusConnected: true })
-
-      // Subscribe to NATS room events (non-blocking)
-      subscribeToRoom(roomCode, (_subject, _data) => {
-        // Streaming events are reflected in Janus callbacks already
-      }).then((sub) => {
-        set({ natsSubscription: sub })
-        console.log('[Stream] NATS subscribed')
-      }).catch((e) => {
-        console.warn('[Stream] NATS subscription failed (non-critical):', e)
+      set({
+        liveKitRoomName: access.room_name,
+        connectedRoomCode: roomCode,
+        liveKitConnected: true,
+        error: null,
       })
     } catch (e) {
-      console.error('[Stream] Initialize failed:', e)
       set({ error: e instanceof Error ? e.message : 'Failed to initialize video' })
     }
   },
 
   startStreaming: async (roomCode: string) => {
     try {
-      await janusVideoRoom.publish()
-      set({ isStreaming: true, error: null })
+      if (!liveKitRoom || get().connectedRoomCode !== roomCode) {
+        await get().initializeLiveKit(roomCode)
+      }
 
-      // Notify backend
+      if (!liveKitRoom) {
+        throw new Error('LiveKit connection is not available')
+      }
+
+      await liveKitRoom.localParticipant.setCameraEnabled(true)
+      await liveKitRoom.localParticipant.setMicrophoneEnabled(true)
+      syncLocalStream(set)
+      set({ isStreaming: true, isMuted: false, isVideoOff: false, error: null })
+
       await roomApi.updateStreaming(roomCode, true).catch(() => {})
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Failed to start streaming' })
@@ -118,15 +205,14 @@ export const useStreamStore = create<StreamState>((set, get) => ({
 
   stopStreaming: async (roomCode: string) => {
     try {
-      await janusVideoRoom.unpublish()
-      set({ isStreaming: false })
-
-      // Stop local media tracks
-      const { localStream } = get()
-      if (localStream) {
-        localStream.getTracks().forEach((t) => t.stop())
-        set({ localStream: null })
+      if (!liveKitRoom) {
+        return
       }
+
+      await liveKitRoom.localParticipant.setCameraEnabled(false)
+      await liveKitRoom.localParticipant.setMicrophoneEnabled(false)
+      syncLocalStream(set)
+      set({ isStreaming: false, isMuted: false, isVideoOff: false })
 
       await roomApi.updateStreaming(roomCode, false).catch(() => {})
     } catch (e) {
@@ -134,34 +220,50 @@ export const useStreamStore = create<StreamState>((set, get) => ({
     }
   },
 
-  toggleMute: () => {
-    const isMuted = janusVideoRoom.toggleMute()
-    set({ isMuted })
+  toggleMute: async () => {
+    if (!liveKitRoom || !get().isStreaming) {
+      return
+    }
+
+    try {
+      const nextMuted = !get().isMuted
+      await liveKitRoom.localParticipant.setMicrophoneEnabled(!nextMuted)
+      syncLocalStream(set)
+      set({ isMuted: nextMuted, error: null })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to toggle microphone' })
+    }
   },
 
-  toggleVideo: () => {
-    const isVideoOff = janusVideoRoom.toggleVideo()
-    set({ isVideoOff })
+  toggleVideo: async () => {
+    if (!liveKitRoom || !get().isStreaming) {
+      return
+    }
+
+    try {
+      const nextVideoOff = !get().isVideoOff
+      await liveKitRoom.localParticipant.setCameraEnabled(!nextVideoOff)
+      syncLocalStream(set)
+      set({ isVideoOff: nextVideoOff, error: null })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'Failed to toggle camera' })
+    }
   },
 
   cleanup: () => {
-    const { localStream, natsSubscription } = get()
+    connectGeneration += 1
+    const { connectedRoomCode, isStreaming } = get()
 
-    // Stop local media tracks
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop())
+    if (connectedRoomCode && isStreaming) {
+      void roomApi.updateStreaming(connectedRoomCode, false).catch(() => {})
     }
 
-    // Unsubscribe from NATS
-    if (natsSubscription) {
-      natsSubscription.unsubscribe()
+    if (liveKitRoom) {
+      liveKitRoom.disconnect()
+      liveKitRoom = null
     }
 
-    // Destroy Janus session
-    janusVideoRoom.destroy()
-
-    // Close NATS
-    closeNatsConnection().catch(() => {})
+    remoteStreamsByIdentity.clear()
 
     set({
       isStreaming: false,
@@ -169,10 +271,10 @@ export const useStreamStore = create<StreamState>((set, get) => ({
       isVideoOff: false,
       localStream: null,
       remoteStreams: [],
-      janusRoomId: null,
-      janusConnected: false,
+      liveKitRoomName: null,
+      connectedRoomCode: null,
+      liveKitConnected: false,
       error: null,
-      natsSubscription: null,
     })
   },
 }))

@@ -41,6 +41,11 @@ const PLAYER_COLORS = [
 const DREAM_POSITIONS = [3, 7, 10, 13, 3, 7]
 
 let logIdCounter = 0
+let syncingFromServer = false
+
+export function isApplyingServerState() {
+  return syncingFromServer
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function addLog(state: any, player: Player, message: string): any {
@@ -62,6 +67,8 @@ function addLog(state: any, player: Player, message: string): any {
 interface GameStore extends GameState {
   // Mode selection
   setGameMode: (mode: GameMode) => void
+  openProfile: () => void
+  showModeSelect: () => void
 
   // Setup
   startGame: (players: SetupPlayer[]) => void
@@ -127,6 +134,14 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   setGameMode: (mode: GameMode) => {
     set({ gameMode: mode, phase: 'setup' })
+  },
+
+  openProfile: () => {
+    set({ phase: 'profile' })
+  },
+
+  showModeSelect: () => {
+    set({ phase: 'mode_select' })
   },
 
   getCurrentPlayer: () => {
@@ -945,6 +960,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   },
 
   syncFromServer: (serverState: GameState) => {
+    syncingFromServer = true
     set({
       ...serverState,
       // Recover from mid-animation phases that may be in transit
@@ -953,6 +969,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
           ? 'roll'
           : serverState.turnPhase,
     })
+    syncingFromServer = false
   },
 }))
 

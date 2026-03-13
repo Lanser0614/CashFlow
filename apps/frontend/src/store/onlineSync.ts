@@ -1,4 +1,4 @@
-import { useGameStore } from './gameStore'
+import { isApplyingServerState, useGameStore } from './gameStore'
 import { useRoomStore } from './roomStore'
 import type { TurnPhase } from '../types'
 
@@ -15,6 +15,8 @@ const SYNCABLE_PHASES: TurnPhase[] = ['roll', 'card_shown', 'market_sell', 'end_
  */
 export function startOnlineSync(): () => void {
   return useGameStore.subscribe((state, prevState) => {
+    if (isApplyingServerState()) return
+
     const room = useRoomStore.getState()
     if (room.screen !== 'game_online' || !room.room) return
 

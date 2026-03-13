@@ -80,12 +80,21 @@ export interface CreateSavePayload {
 
 export interface GameResultItem {
   id: number
+  session_key: string | null
+  game_mode: 'classic' | 'quick'
   winner_name: string
+  player_name: string | null
   winner_profession: string
+  player_profession: string | null
   winner_cash: number
+  player_cash: number
   winner_passive_income: number
+  player_passive_income: number
   winner_net_worth: number
+  player_net_worth: number
   player_count: number
+  did_win: boolean
+  is_completed: boolean
   player_summaries: Array<{
     name: string
     profession: string
@@ -93,23 +102,46 @@ export interface GameResultItem {
     passiveIncome: number
     track: string
   }>
+  journal: Array<{
+    id: number
+    playerName: string
+    playerColor: string
+    message: string
+    timestamp: number
+  }>
   total_turns: number
   created_at: string
 }
 
 export interface CreateResultPayload {
+  session_key: string
+  game_mode: 'classic' | 'quick'
   winner_name: string
+  player_name?: string
   winner_profession: string
+  player_profession?: string
   winner_cash: number
+  player_cash: number
   winner_passive_income: number
+  player_passive_income: number
   winner_net_worth: number
+  player_net_worth: number
   player_count: number
+  did_win: boolean
+  is_completed: boolean
   player_summaries: Array<{
     name: string
     profession: string
     cash: number
     passiveIncome: number
     track: string
+  }>
+  journal: Array<{
+    id: number
+    playerName: string
+    playerColor: string
+    message: string
+    timestamp: number
   }>
   total_turns: number
 }
@@ -142,6 +174,8 @@ export const gameApi = {
   listResults: () => request<GameResultItem[]>('GET', '/results'),
 
   storeResult: (data: CreateResultPayload) => request<GameResultItem>('POST', '/results', data),
+
+  syncResult: (data: CreateResultPayload) => request<GameResultItem>('POST', '/results/sync', data),
 }
 
 // Room types
@@ -219,15 +253,15 @@ export const roomApi = {
     }),
 
   // Video streaming
-  createVideoRoom: (code: string) =>
-    request<{ janus_room_id: number }>('POST', `/rooms/${code}/video-room`),
-
-  getVideoRoom: (code: string) =>
-    request<{ janus_room_id: number; participants: Array<{ user_id: number; is_streaming: boolean }> }>('GET', `/rooms/${code}/video-room`),
+  getLiveKitToken: (code: string) =>
+    request<{
+      token: string
+      ws_url: string
+      room_name: string
+      participant_identity: string
+      participant_name: string
+    }>('POST', `/rooms/${code}/livekit/token`),
 
   updateStreaming: (code: string, isStreaming: boolean) =>
     request<{ is_streaming: boolean }>('POST', `/rooms/${code}/streaming`, { is_streaming: isStreaming }),
-
-  destroyVideoRoom: (code: string) =>
-    request<{ message: string }>('DELETE', `/rooms/${code}/video-room`),
 }
