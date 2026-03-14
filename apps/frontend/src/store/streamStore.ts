@@ -37,6 +37,18 @@ let liveKitRoom: Room | null = null
 const remoteStreamsByIdentity = new Map<string, RemoteStream>()
 let connectGeneration = 0
 
+function canUseMediaDevices(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function'
+}
+
+function getMediaDevicesErrorMessage(): string {
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    return 'Камера и микрофон работают только по HTTPS или на localhost. Для сервера по IP используйте HTTPS.'
+  }
+
+  return 'Браузер не поддерживает доступ к камере и микрофону в текущем окружении.'
+}
+
 function formatLiveKitError(error: unknown, wsUrl?: string): string {
   const fallbackMessage = 'Не удалось подключить видео'
 
@@ -54,6 +66,13 @@ function formatLiveKitError(error: unknown, wsUrl?: string): string {
   ) {
     const target = wsUrl || 'серверу LiveKit'
     return `LiveKit недоступен по адресу ${target}. Запустите сервис livekit и проверьте порт 7880.`
+  }
+
+  if (
+    message.includes('getUserMedia') ||
+    message.includes("Cannot read properties of undefined (reading 'getUserMedia')")
+  ) {
+    return getMediaDevicesErrorMessage()
   }
 
   return message || fallbackMessage
@@ -217,6 +236,10 @@ export const useStreamStore = create<StreamState>((set, get) => ({
         throw new Error('LiveKit connection is not available')
       }
 
+      if (!canUseMediaDevices()) {
+        throw new Error(getMediaDevicesErrorMessage())
+      }
+
       await liveKitRoom.localParticipant.setCameraEnabled(true)
       await liveKitRoom.localParticipant.setMicrophoneEnabled(true)
       syncLocalStream(set)
@@ -251,6 +274,10 @@ export const useStreamStore = create<StreamState>((set, get) => ({
     }
 
     try {
+      if (!canUseMediaDevices()) {
+        throw new Error(getMediaDevicesErrorMessage())
+      }
+
       const nextMuted = !get().isMuted
       await liveKitRoom.localParticipant.setMicrophoneEnabled(!nextMuted)
       syncLocalStream(set)
@@ -266,6 +293,10 @@ export const useStreamStore = create<StreamState>((set, get) => ({
     }
 
     try {
+      if (!canUseMediaDevices()) {
+        throw new Error(getMediaDevicesErrorMessage())
+      }
+
       const nextVideoOff = !get().isVideoOff
       await liveKitRoom.localParticipant.setCameraEnabled(!nextVideoOff)
       syncLocalStream(set)
