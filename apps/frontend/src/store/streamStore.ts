@@ -37,6 +37,28 @@ let liveKitRoom: Room | null = null
 const remoteStreamsByIdentity = new Map<string, RemoteStream>()
 let connectGeneration = 0
 
+function formatLiveKitError(error: unknown, wsUrl?: string): string {
+  const fallbackMessage = 'Не удалось подключить видео'
+
+  if (!(error instanceof Error)) {
+    return fallbackMessage
+  }
+
+  const message = error.message.trim()
+
+  if (
+    message.includes('Could not establish signal connection') ||
+    message.includes('Connection refused') ||
+    message.includes('Failed to fetch') ||
+    message.includes('LiveKit connection is not available')
+  ) {
+    const target = wsUrl || 'серверу LiveKit'
+    return `LiveKit недоступен по адресу ${target}. Запустите сервис livekit и проверьте порт 7880.`
+  }
+
+  return message || fallbackMessage
+}
+
 function collectTracks(participant: ParticipantWithTracks): MediaStreamTrack[] {
   return Array.from(participant.trackPublications.values())
     .map((publication) => publication.track?.mediaStreamTrack ?? null)
@@ -91,11 +113,14 @@ export const useStreamStore = create<StreamState>((set, get) => ({
       return
     }
 
+    let liveKitUrl: string | undefined
+
     try {
       get().cleanup()
       const generation = connectGeneration
 
       const access = await roomApi.getLiveKitToken(roomCode)
+      liveKitUrl = access.ws_url
       const room = new Room()
 
       room.on(RoomEvent.TrackSubscribed, (_track, _publication, participant) => {
@@ -178,7 +203,7 @@ export const useStreamStore = create<StreamState>((set, get) => ({
         error: null,
       })
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : 'Failed to initialize video' })
+      set({ error: formatLiveKitError(e, liveKitUrl) })
     }
   },
 
@@ -199,7 +224,7 @@ export const useStreamStore = create<StreamState>((set, get) => ({
 
       await roomApi.updateStreaming(roomCode, true).catch(() => {})
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : 'Failed to start streaming' })
+      set({ error: formatLiveKitError(e) })
     }
   },
 

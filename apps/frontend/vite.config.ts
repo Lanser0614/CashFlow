@@ -12,6 +12,11 @@ export default defineConfig({
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/nats': {
+        target: process.env.VITE_NATS_WS_URL || 'ws://localhost:9222',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
 })

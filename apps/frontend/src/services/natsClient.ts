@@ -3,13 +3,27 @@ import type { NatsConnection, Subscription } from 'nats.ws'
 
 let nc: NatsConnection | null = null
 
+function getNatsServerUrl(): string {
+  const configuredUrl = import.meta.env.VITE_NATS_WS_URL?.trim()
+
+  if (configuredUrl) {
+    return configuredUrl
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+
+  if (import.meta.env.DEV) {
+    return `${protocol}://${window.location.hostname || 'localhost'}:9222`
+  }
+
+  return `${protocol}://${window.location.host}/nats`
+}
+
 export async function getNatsConnection(): Promise<NatsConnection> {
   if (nc && !nc.isClosed()) return nc
 
-  const wsPort = 9222
-  const host = window.location.hostname || 'localhost'
   nc = await connect({
-    servers: `ws://${host}:${wsPort}`,
+    servers: getNatsServerUrl(),
   })
   return nc
 }

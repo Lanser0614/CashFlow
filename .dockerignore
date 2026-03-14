@@ -1,0 +1,14 @@
+.git
+.gitignore
+.DS_Store
+.env
+.env.*
+!.env.production.example
+apps/backend/.env
+apps/frontend/.env
+apps/backend/vendor
+apps/frontend/node_modules
+apps/frontend/dist
+mysql_data
+nats_data
+
