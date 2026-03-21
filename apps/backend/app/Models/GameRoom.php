@@ -16,6 +16,7 @@ class GameRoom extends Model
         'host_user_id',
         'status',
         'max_players',
+        'game_mode',
         'game_state',
         'state_version',
         'janus_room_id',

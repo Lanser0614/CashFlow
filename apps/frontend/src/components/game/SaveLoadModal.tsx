@@ -11,6 +11,10 @@ interface Props {
   initialTab?: Tab
 }
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [saves, setSaves] = useState<GameSaveListItem[]>([])
@@ -41,6 +45,7 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
     const state = useGameStore.getState()
     return {
       phase: state.phase,
+      gameMode: state.gameMode,
       players: state.players,
       currentPlayerIndex: state.currentPlayerIndex,
       turnPhase: state.turnPhase,
@@ -58,6 +63,10 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
       doodadDeck: state.doodadDeck,
       marketDeck: state.marketDeck,
       turnNumber: state.turnNumber,
+      surpriseDeck: state.surpriseDeck,
+      surpriseDeckIndex: state.surpriseDeckIndex,
+      extraTurnFlag: state.extraTurnFlag,
+      variantState: state.variantState,
     }
   }
 
@@ -70,6 +79,7 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
       const currentPlayer = state.players[state.currentPlayerIndex]
       console.log(currentPlayer)
       await gameApi.createSave({
+        game_mode: state.gameMode,
         name: saveName.trim(),
         game_state: getSerializableState(),
         player_count: state.players.length,
@@ -79,8 +89,8 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
       setSuccess('Игра сохранена!')
       await fetchSaves()
       setTimeout(() => setSuccess(''), 2000)
-    } catch (err: any) {
-      setError(err.message || 'Ошибка сохранения')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Ошибка сохранения'))
     } finally {
       setLoading(false)
     }
@@ -93,6 +103,7 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
       const state = useGameStore.getState()
       const currentPlayer = state.players[state.currentPlayerIndex]
       await gameApi.updateSave(save.id, {
+        game_mode: state.gameMode,
         name: save.name,
         game_state: getSerializableState(),
         player_count: state.players.length,
@@ -102,8 +113,8 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
       setSuccess('Сохранение обновлено!')
       await fetchSaves()
       setTimeout(() => setSuccess(''), 2000)
-    } catch (err: any) {
-      setError(err.message || 'Ошибка обновления')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Ошибка обновления'))
     } finally {
       setLoading(false)
     }
@@ -114,10 +125,16 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
     setError('')
     try {
       const detail = await gameApi.getSave(save.id)
+      const currentVariant = useGameStore.getState().gameMode
+      if (currentVariant !== detail.game_mode) {
+        setError('Нельзя загрузить сохранение другой версии игры')
+        setLoading(false)
+        return
+      }
       loadGameState(detail.game_state as unknown as GameState)
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Ошибка загрузки')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Ошибка загрузки'))
       setLoading(false)
     }
   }
@@ -128,8 +145,8 @@ export function SaveLoadModal({ onClose, initialTab = 'save' }: Props) {
     try {
       await gameApi.deleteSave(save.id)
       await fetchSaves()
-    } catch (err: any) {
-      setError(err.message || 'Ошибка удаления')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Ошибка удаления'))
     } finally {
       setLoading(false)
     }

@@ -9,6 +9,7 @@ class GameSave extends Model
 {
     protected $fillable = [
         'user_id',
+        'game_mode',
         'name',
         'game_state',
         'player_count',

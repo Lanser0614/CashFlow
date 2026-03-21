@@ -1,11 +1,18 @@
 import { create } from 'zustand'
 import { authApi, setToken, clearToken, getToken, type AuthUser } from '../services/api'
 
+const GUEST_MODE_KEY = 'cashflow_guest_mode'
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 interface AuthState {
   user: AuthUser | null
   isAuthenticated: boolean
   isGuest: boolean
   isLoading: boolean
+  shouldPromptTutorial: boolean
   error: string | null
 
   register: (name: string, username: string, password: string, passwordConfirmation: string) => Promise<void>
@@ -13,6 +20,7 @@ interface AuthState {
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
   playAsGuest: () => void
+  dismissTutorialPrompt: () => void
   clearError: () => void
 }
 
@@ -21,6 +29,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   isAuthenticated: false,
   isGuest: false,
   isLoading: true,
+  shouldPromptTutorial: false,
   error: null,
 
   register: async (name, username, password, passwordConfirmation) => {
@@ -33,9 +42,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
         password_confirmation: passwordConfirmation,
       })
       setToken(res.token)
-      set({ user: res.user, isAuthenticated: true, isGuest: false, isLoading: false })
-    } catch (err: any) {
-      set({ error: err.message || 'Ошибка регистрации', isLoading: false })
+      localStorage.removeItem(GUEST_MODE_KEY)
+      localStorage.setItem('cashflow_tutorial_prompt_pending', '1')
+      set({ user: res.user, isAuthenticated: true, isGuest: false, isLoading: false, shouldPromptTutorial: true })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Ошибка регистрации'), isLoading: false })
     }
   },
 
@@ -44,9 +55,16 @@ export const useAuthStore = create<AuthState>()((set) => ({
     try {
       const res = await authApi.login({ username, password })
       setToken(res.token)
-      set({ user: res.user, isAuthenticated: true, isGuest: false, isLoading: false })
-    } catch (err: any) {
-      set({ error: err.message || 'Ошибка входа', isLoading: false })
+      localStorage.removeItem(GUEST_MODE_KEY)
+      set({
+        user: res.user,
+        isAuthenticated: true,
+        isGuest: false,
+        isLoading: false,
+        shouldPromptTutorial: localStorage.getItem('cashflow_tutorial_prompt_pending') === '1',
+      })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Ошибка входа'), isLoading: false })
     }
   },
 
@@ -57,26 +75,41 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // Token may already be invalid
     }
     clearToken()
-    set({ user: null, isAuthenticated: false, isGuest: false, isLoading: false })
+    localStorage.removeItem(GUEST_MODE_KEY)
+    set({ user: null, isAuthenticated: false, isGuest: false, isLoading: false, shouldPromptTutorial: false })
   },
 
   checkAuth: async () => {
     const token = getToken()
     if (!token) {
-      set({ isLoading: false })
+      const isGuest = localStorage.getItem(GUEST_MODE_KEY) === '1'
+      set({ isGuest, isLoading: false, shouldPromptTutorial: false })
       return
     }
     try {
       const res = await authApi.getUser()
-      set({ user: res.user, isAuthenticated: true, isLoading: false })
+      localStorage.removeItem(GUEST_MODE_KEY)
+      set({
+        user: res.user,
+        isAuthenticated: true,
+        isLoading: false,
+        shouldPromptTutorial: localStorage.getItem('cashflow_tutorial_prompt_pending') === '1',
+      })
     } catch {
       clearToken()
-      set({ user: null, isAuthenticated: false, isLoading: false })
+      const isGuest = localStorage.getItem(GUEST_MODE_KEY) === '1'
+      set({ user: null, isAuthenticated: false, isGuest, isLoading: false, shouldPromptTutorial: false })
     }
   },
 
   playAsGuest: () => {
-    set({ isGuest: true, isLoading: false })
+    localStorage.setItem(GUEST_MODE_KEY, '1')
+    set({ isGuest: true, isLoading: false, shouldPromptTutorial: false })
+  },
+
+  dismissTutorialPrompt: () => {
+    localStorage.removeItem('cashflow_tutorial_prompt_pending')
+    set({ shouldPromptTutorial: false })
   },
 
   clearError: () => set({ error: null }),

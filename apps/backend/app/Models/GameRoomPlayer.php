@@ -16,6 +16,7 @@ class GameRoomPlayer extends Model
         'player_index',
         'player_name',
         'profession_id',
+        'custom_financial_profile',
         'color',
         'is_ready',
     ];
@@ -23,6 +24,7 @@ class GameRoomPlayer extends Model
     protected $casts = [
         'is_ready' => 'boolean',
         'player_index' => 'integer',
+        'custom_financial_profile' => 'array',
     ];
 
     public function room(): BelongsTo

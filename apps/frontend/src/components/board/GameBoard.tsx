@@ -1,9 +1,7 @@
-import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
-import { RAT_RACE_SPACES, FAST_TRACK_SPACES } from '../../data/board'
-import { QUICK_BOARD_SPACES, QUICK_BOARD_SIZE } from '../../data/quickMode'
 import type { BoardSpace, Player } from '../../types'
+import { getGameVariantModule, isQuickVariant } from '../../modules/game-variants'
 
 // Board layout: 24 spaces around perimeter, fast track ring in center
 const BOARD_SIZE = 500
@@ -138,21 +136,19 @@ export function GameBoard() {
   const players = useGameStore((s) => s.players)
   const currentPlayerIndex = useGameStore((s) => s.currentPlayerIndex)
   const gameMode = useGameStore((s) => s.gameMode)
+  const variant = getGameVariantModule(gameMode)
   const currentPlayer = players[currentPlayerIndex]
-  const isQuick = gameMode === 'quick'
+  const isQuick = isQuickVariant(gameMode)
 
-  const boardSpaces = isQuick ? QUICK_BOARD_SPACES : RAT_RACE_SPACES
-  const boardSize = isQuick ? QUICK_BOARD_SIZE : 24
+  const boardSpaces = variant.board.ratRaceSpaces
+  const boardSize = variant.board.ratRaceSize
 
-  const outerPositions = useMemo(
-    () => computeRatRacePositions(boardSize, BOARD_SIZE),
-    [boardSize],
-  )
+  const outerPositions = computeRatRacePositions(boardSize, BOARD_SIZE)
 
   // Fast track: small ring inside (classic only)
-  const fastTrackPositions = useMemo(() => {
+  const fastTrackPositions = (() => {
     if (isQuick) return []
-    const count = 16
+    const count = variant.board.fastTrackSize
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 2 - Math.PI / 2
       const r = 120
@@ -161,7 +157,7 @@ export function GameBoard() {
         y: CENTER_Y + r * Math.sin(angle),
       }
     })
-  }, [isQuick])
+  })()
 
   const ratRacePlayers = players.filter((p) => p.track === 'rat')
   const fastTrackPlayers = players.filter((p) => p.track === 'fast')
@@ -196,7 +192,7 @@ export function GameBoard() {
           fontSize={28}
           fontWeight="bold"
         >
-          {isQuick ? '⚡' : '💰'}
+          {variant.board.centerIcon}
         </text>
         <text
           x={CENTER_X}
@@ -206,7 +202,7 @@ export function GameBoard() {
           fontSize={12}
           fontWeight="bold"
         >
-          {isQuick ? 'БЫСТРАЯ ИГРА' : 'КРЫСИНЫЕ БЕГА'}
+          {variant.board.centerLabel}
         </text>
         {!isQuick && (
           <text
@@ -258,7 +254,7 @@ export function GameBoard() {
         })}
 
         {/* Fast track spaces (classic only) */}
-        {!isQuick && FAST_TRACK_SPACES.map((space, i) => {
+        {!isQuick && variant.board.fastTrackSpaces.map((space, i) => {
           const pos = fastTrackPositions[i]
           const isCurrentPos = currentPlayer?.track === 'fast' && currentPlayer?.position === i
           return (

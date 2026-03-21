@@ -1,9 +1,11 @@
 import type { AnyCard } from './cards'
+import type { ExchangeOpportunity } from './player'
 import type { Player } from './player'
 
 export type GamePhase = 'mode_select' | 'profile' | 'setup' | 'playing' | 'won'
 
-export type GameMode = 'classic' | 'quick'
+export type GameVariant = 'cashflow101_classic' | 'cashflow101_quick' | 'cashflow202'
+export type GameMode = GameVariant
 
 export type TurnPhase =
   | 'roll'          // waiting for dice roll
@@ -24,6 +26,34 @@ export interface LogEntry {
 export interface SetupPlayer {
   name: string
   professionId: string
+  customFinancialProfile?: CustomFinancialProfile
+}
+
+export interface CustomFinancialProfile {
+  startingCash: number
+  salary: number
+  taxes: number
+  mortgage: number
+  carLoan: number
+  creditCard: number
+  schoolLoan: number
+  otherExpenses: number
+  childExpenses: number
+  homeMortgageBalance: number
+  carLoanBalance: number
+  creditCardBalance: number
+  schoolLoanBalance: number
+}
+
+export interface Cashflow202VariantState {
+  realizedGainsByPlayer: Record<string, number>
+  marginReservedCashByPlayer: Record<string, number>
+  exchangeOffers: ExchangeOpportunity[]
+  startingPortfolioGranted: boolean
+}
+
+export interface VariantState {
+  cashflow202: Cashflow202VariantState
 }
 
 export interface GameState {
@@ -51,4 +81,5 @@ export interface GameState {
   surpriseDeck: string[]
   surpriseDeckIndex: number
   extraTurnFlag: boolean   // for surprise "extra turn" effect
+  variantState: VariantState
 }

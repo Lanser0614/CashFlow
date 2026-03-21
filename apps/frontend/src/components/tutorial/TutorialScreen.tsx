@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { StepWelcome } from './steps/StepWelcome'
 import { StepTwoTracks } from './steps/StepTwoTracks'
 import { StepFinancialStatement } from './steps/StepFinancialStatement'
+import { StepGlossary } from './steps/StepGlossary'
 import { StepProfessions } from './steps/StepProfessions'
 import { StepTurnFlow } from './steps/StepTurnFlow'
 import { StepBoardSpaces } from './steps/StepBoardSpaces'
@@ -13,6 +14,7 @@ const STEPS = [
   { title: 'Добро пожаловать', component: StepWelcome },
   { title: 'Два трека', component: StepTwoTracks },
   { title: 'Финансовый отчёт', component: StepFinancialStatement },
+  { title: 'Быстрый словарь', component: StepGlossary },
   { title: 'Выбор профессии', component: StepProfessions },
   { title: 'Ход игры', component: StepTurnFlow },
   { title: 'Типы клеток', component: StepBoardSpaces },

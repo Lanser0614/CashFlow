@@ -1,5 +1,12 @@
 export type DealCategory = 'stock' | 'real_estate' | 'business' | 'other'
 
+export type AdvancedInstrumentKind =
+  | 'option_call'
+  | 'option_put'
+  | 'short_sale'
+  | 'straddle'
+  | 'exchange'
+
 export interface SmallDeal {
   id: string
   type: 'small_deal'
@@ -15,6 +22,12 @@ export interface SmallDeal {
   pricePerShare?: number
   // For speculation (coin, art, etc.)
   speculationTag?: string  // used by market cards to identify
+  advancedInstrumentKind?: AdvancedInstrumentKind
+  underlyingSymbol?: string
+  strikePrice?: number
+  contractSize?: number
+  marginRequirement?: number
+  exchangeTag?: string
 }
 
 export interface BigDeal {
@@ -27,6 +40,13 @@ export interface BigDeal {
   cashflow: number
   liability?: number
   speculationTag?: string
+  pricePerShare?: number
+  advancedInstrumentKind?: AdvancedInstrumentKind
+  underlyingSymbol?: string
+  strikePrice?: number
+  contractSize?: number
+  marginRequirement?: number
+  exchangeTag?: string
 }
 
 export type DoodadEffect = 'cash' | 'credit_card' | 'per_child'
@@ -48,6 +68,7 @@ export type MarketEffect =
   | { kind: 'real_estate_crash'; loss: number }
   | { kind: 'stock_crash' }
   | { kind: 'interest_rate_cut'; newRate: number }
+  | { kind: 'exchange_offer'; tag: string; multiplier: number }
 
 export interface MarketCard {
   id: string

@@ -1,0 +1,13 @@
+{
+  "name": "kubernetes-week-1-hour-slides",
+  "private": true,
+  "scripts": {
+    "build": "node kubernetes-week-1-hour.cjs"
+  },
+  "dependencies": {
+    "fontkit": "^2.0.4",
+    "linebreak": "^1.1.0",
+    "pptxgenjs": "^3.12.0",
+    "skia-canvas": "^2.0.2"
+  }
+}

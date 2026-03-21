@@ -25,12 +25,13 @@ export function MobileBottomBar({ onMenuPress }: { onMenuPress: () => void }) {
   const autoEndFired = useRef(false)
 
   useEffect(() => {
+    let frame = 0
     if (!endTurnTimerActive) {
-      setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+      frame = requestAnimationFrame(() => setEndTurnTimeLeft(END_TURN_TIMER_SECONDS))
       autoEndFired.current = false
-      return
+      return () => cancelAnimationFrame(frame)
     }
-    setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+    frame = requestAnimationFrame(() => setEndTurnTimeLeft(END_TURN_TIMER_SECONDS))
     autoEndFired.current = false
     const interval = setInterval(() => {
       setEndTurnTimeLeft((prev) => {
@@ -38,7 +39,10 @@ export function MobileBottomBar({ onMenuPress }: { onMenuPress: () => void }) {
         return prev - 1
       })
     }, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearInterval(interval)
+    }
   }, [endTurnTimerActive])
 
   useEffect(() => {

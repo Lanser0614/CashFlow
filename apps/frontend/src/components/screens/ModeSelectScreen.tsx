@@ -1,12 +1,22 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
 import { useRoomStore } from '../../store/roomStore'
+import { getAllGameVariants } from '../../modules/game-variants'
+import { navigateToOnlineLobby } from '../../utils'
+import { TutorialScreen } from '../tutorial/TutorialScreen'
 
 export function ModeSelectScreen() {
+  const [showTutorial, setShowTutorial] = useState(false)
   const setGameMode = useGameStore((s) => s.setGameMode)
   const openProfile = useGameStore((s) => s.openProfile)
   const { user, isAuthenticated, logout } = useAuthStore()
+  const variants = getAllGameVariants()
+
+  if (showTutorial) {
+    return <TutorialScreen onClose={() => setShowTutorial(false)} />
+  }
 
   return (
     <div
@@ -76,72 +86,64 @@ export function ModeSelectScreen() {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            CASH FLOW 101
+            CASH FLOW
           </h1>
-          <p className="text-slate-400">Выберите режим игры</p>
+          <p className="text-slate-400">Выберите версию и режим игры</p>
         </div>
 
         {/* Mode cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
-          {/* Classic Mode */}
-          <motion.button
-            whileHover={{ scale: 1.03, y: -4 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            onClick={() => setGameMode('classic')}
-            className="glass-panel p-4 sm:p-6 text-left cursor-pointer transition-all"
-            style={{ border: '1px solid rgba(99,102,241,0.25)' }}
-          >
-            <div className="text-3xl sm:text-4xl mb-3">🎲</div>
-            <h2 className="text-xl font-bold text-white mb-2">Классическая игра</h2>
-            <p className="text-sm text-slate-400 leading-relaxed mb-4">
-              Полная версия игры с крысиными бегами и быстрым треком.
-              Все профессии, сделки, рыночные события и стратегии.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-                ⏱ 60-90 мин
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-                11 профессий
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-                24 клетки
-              </span>
-            </div>
-          </motion.button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5">
+          {variants.map((variant, index) => {
+            const color = variant.theme === 'quick'
+              ? { border: 'rgba(34,197,94,0.25)', bg: 'rgba(34,197,94,0.15)', text: '#86efac', icon: '⚡' }
+              : variant.theme === 'advanced'
+                ? { border: 'rgba(245,158,11,0.28)', bg: 'rgba(245,158,11,0.15)', text: '#fcd34d', icon: '📈' }
+                : { border: 'rgba(99,102,241,0.25)', bg: 'rgba(99,102,241,0.15)', text: '#a5b4fc', icon: '🎲' }
 
-          {/* Quick Mode */}
-          <motion.button
-            whileHover={{ scale: 1.03, y: -4 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            onClick={() => setGameMode('quick')}
-            className="glass-panel p-4 sm:p-6 text-left cursor-pointer transition-all"
-            style={{ border: '1px solid rgba(34,197,94,0.25)' }}
+            return (
+              <motion.button
+                key={variant.id}
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, x: index === 0 ? -20 : index === 2 ? 20 : 0 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + index * 0.1 }}
+                onClick={() => setGameMode(variant.id)}
+                className="glass-panel p-4 sm:p-6 text-left cursor-pointer transition-all"
+                style={{ border: `1px solid ${color.border}` }}
+              >
+                <div className="text-3xl sm:text-4xl mb-3">{color.icon}</div>
+                <h2 className="text-xl font-bold text-white mb-2">{variant.shortLabel}</h2>
+                <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                  {variant.description}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: color.bg, color: color.text }}>
+                    {variant.ruleset === 'quick' ? '⏱ 15-30 мин' : variant.ruleset === 'advanced' ? '⏱ 70-110 мин' : '⏱ 60-90 мин'}
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: color.bg, color: color.text }}>
+                    {variant.professions.length} профессий
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: color.bg, color: color.text }}>
+                    {variant.board.ratRaceSize} клеток
+                  </span>
+                </div>
+              </motion.button>
+            )
+          })}
+        </div>
+
+        <div className="flex justify-center mt-5">
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="rounded-xl px-5 py-3 text-sm font-semibold text-white border transition-colors"
+            style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              borderColor: 'rgba(245, 158, 11, 0.24)',
+            }}
           >
-            <div className="text-3xl sm:text-4xl mb-3">⚡</div>
-            <h2 className="text-xl font-bold text-white mb-2">Быстрая игра</h2>
-            <p className="text-sm text-slate-400 leading-relaxed mb-4">
-              Упрощённая версия для быстрой партии.
-              Меньше клеток, простые правила, сюрпризы!
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#86efac' }}>
-                ⏱ 15-30 мин
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#86efac' }}>
-                3 профессии
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#86efac' }}>
-                12 клеток
-              </span>
-            </div>
-          </motion.button>
+            📖 Как играть
+          </button>
         </div>
 
         {/* Online play button */}
@@ -157,7 +159,10 @@ export function ModeSelectScreen() {
               background: 'linear-gradient(135deg, #14b8a6, #6366f1)',
               border: 'none',
             }}
-            onClick={() => useRoomStore.getState().setScreen('lobby')}
+            onClick={() => {
+              navigateToOnlineLobby()
+              useRoomStore.getState().setScreen('lobby')
+            }}
           >
             🌐 Играть онлайн
           </motion.button>

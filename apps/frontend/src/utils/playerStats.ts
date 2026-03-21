@@ -1,7 +1,33 @@
-import type { Player, PlayerStats } from '../types'
+import type { Player, PlayerStats, VariantState } from '../types'
 
-export function computePlayerStats(player: Player): PlayerStats {
+function getOptionValue(player: Player): number {
+  return player.statement.options.reduce((sum, option) => {
+    const intrinsic = option.optionType === 'call'
+      ? Math.max(option.currentPrice - option.strikePrice, 0)
+      : Math.max(option.strikePrice - option.currentPrice, 0)
+    return sum + intrinsic * option.contractSize
+  }, 0)
+}
+
+function getStraddleValue(player: Player): number {
+  return player.statement.straddles.reduce((sum, straddle) => {
+    const callLeg = Math.max(straddle.currentPrice - straddle.strikePrice, 0)
+    const putLeg = Math.max(straddle.strikePrice - straddle.currentPrice, 0)
+    return sum + (callLeg + putLeg) * straddle.contractSize
+  }, 0)
+}
+
+function getShortPnl(player: Player): number {
+  return player.statement.shortPositions.reduce(
+    (sum, position) => sum + (position.salePrice - position.currentPrice) * position.shares,
+    0,
+  )
+}
+
+export function computePlayerStats(player: Player, variantState?: VariantState): PlayerStats {
   const s = player.statement
+  const realizedGains = variantState?.cashflow202.realizedGainsByPlayer[player.id] ?? 0
+  const marginReservedCash = s.shortPositions.reduce((sum, position) => sum + position.marginReservedCash, 0)
 
   // Passive income from all assets
   const passiveIncome =
@@ -37,7 +63,13 @@ export function computePlayerStats(player: Player): PlayerStats {
     (sum, b) => sum + b.purchasePrice,
     0,
   )
-  const totalAssets = player.cash + stockValue + realEstateValue + businessValue
+  const speculationValue = s.speculations.reduce((sum, spec) => sum + spec.purchasePrice, 0)
+  const optionValue = getOptionValue(player)
+  const straddleValue = getStraddleValue(player)
+  const exchangeValue = s.exchangeOpportunities.reduce((sum, opportunity) => sum + opportunity.purchasePrice, 0)
+  const shortValue = marginReservedCash + getShortPnl(player)
+  const portfolioValue = stockValue + realEstateValue + businessValue + speculationValue + optionValue + straddleValue + exchangeValue + shortValue
+  const totalAssets = player.cash + portfolioValue
 
   // Liabilities
   const reMortgages = s.realEstate.reduce((sum, re) => sum + re.mortgage, 0)
@@ -50,6 +82,21 @@ export function computePlayerStats(player: Player): PlayerStats {
     reMortgages +
     businessLoans
 
+  const unrealizedGains =
+    s.stocks.reduce((sum, stock) => sum + (stock.currentPrice - stock.purchasePrice) * stock.shares, 0) +
+    s.options.reduce((sum, option) => {
+      const intrinsic = option.optionType === 'call'
+        ? Math.max(option.currentPrice - option.strikePrice, 0)
+        : Math.max(option.strikePrice - option.currentPrice, 0)
+      return sum + intrinsic * option.contractSize - option.premium
+    }, 0) +
+    s.straddles.reduce((sum, straddle) => {
+      const callLeg = Math.max(straddle.currentPrice - straddle.strikePrice, 0)
+      const putLeg = Math.max(straddle.strikePrice - straddle.currentPrice, 0)
+      return sum + (callLeg + putLeg) * straddle.contractSize - straddle.premium
+    }, 0) +
+    getShortPnl(player)
+
   const netWorth = totalAssets - totalLiabilities
 
   return {
@@ -60,6 +107,10 @@ export function computePlayerStats(player: Player): PlayerStats {
     totalAssets,
     totalLiabilities,
     netWorth,
+    realizedGains,
+    unrealizedGains,
+    marginReservedCash,
+    portfolioValue,
   }
 }
 

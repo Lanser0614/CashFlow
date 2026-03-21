@@ -5,8 +5,7 @@ import { useRoomStore } from '../../store/roomStore'
 import { Dice } from './Dice'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
-import { RAT_RACE_SPACES, FAST_TRACK_SPACES } from '../../data/board'
-import { QUICK_BOARD_SPACES } from '../../data/quickMode'
+import { getGameVariantModule, isQuickVariant } from '../../modules/game-variants'
 
 const END_TURN_TIMER_SECONDS = 5
 
@@ -18,7 +17,9 @@ export function TurnPanel() {
   const rollDiceAction = useGameStore((s) => s.rollDiceAction)
   const endTurn = useGameStore((s) => s.endTurn)
   const gameMode = useGameStore((s) => s.gameMode)
-  const isQuick = gameMode === 'quick'
+  const variantState = useGameStore((s) => s.variantState)
+  const variant = getGameVariantModule(gameMode)
+  const isQuick = isQuickVariant(gameMode)
   const roomScreen = useRoomStore((s) => s.screen)
   const isOnline = roomScreen === 'game_online'
   const isMyTurn = useRoomStore((s) => s.isMyTurn)()
@@ -30,12 +31,13 @@ export function TurnPanel() {
   const autoEndFired = useRef(false)
 
   useEffect(() => {
+    let frame = 0
     if (!endTurnTimerActive) {
-      setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+      frame = requestAnimationFrame(() => setEndTurnTimeLeft(END_TURN_TIMER_SECONDS))
       autoEndFired.current = false
-      return
+      return () => cancelAnimationFrame(frame)
     }
-    setEndTurnTimeLeft(END_TURN_TIMER_SECONDS)
+    frame = requestAnimationFrame(() => setEndTurnTimeLeft(END_TURN_TIMER_SECONDS))
     autoEndFired.current = false
     const interval = setInterval(() => {
       setEndTurnTimeLeft((prev) => {
@@ -46,7 +48,10 @@ export function TurnPanel() {
         return prev - 1
       })
     }, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearInterval(interval)
+    }
   }, [endTurnTimerActive])
 
   useEffect(() => {
@@ -58,8 +63,8 @@ export function TurnPanel() {
   const player = players[currentPlayerIndex]
   if (!player) return null
 
-  const stats = computePlayerStats(player)
-  const spaces = isQuick ? QUICK_BOARD_SPACES : (player.track === 'rat' ? RAT_RACE_SPACES : FAST_TRACK_SPACES)
+  const stats = computePlayerStats(player, variantState)
+  const spaces = player.track === 'rat' ? variant.board.ratRaceSpaces : variant.board.fastTrackSpaces
   const currentSpace = spaces[player.position]
   const diceCount = isQuick ? 1 : (player.track === 'fast' || player.chariteTurnsLeft > 0 ? 2 : 1)
   const isRolling = turnPhase === 'moving'

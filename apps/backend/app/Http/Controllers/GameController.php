@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\GameVariants\GameVariant;
 use App\Models\GameResult;
 use App\Models\GameSave;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class GameController extends Controller
 {
@@ -12,7 +14,7 @@ class GameController extends Controller
     {
         $saves = GameSave::where('user_id', $request->user()->id)
             ->orderByDesc('updated_at')
-            ->get(['id', 'name', 'player_count', 'current_player_name', 'turn_number', 'created_at', 'updated_at']);
+            ->get(['id', 'game_mode', 'name', 'player_count', 'current_player_name', 'turn_number', 'created_at', 'updated_at']);
 
         return response()->json($saves);
     }
@@ -20,6 +22,7 @@ class GameController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'game_mode' => 'required|string',
             'name' => 'required|string|max:255',
             'game_state' => 'required|array',
             'player_count' => 'required|integer',
@@ -27,8 +30,16 @@ class GameController extends Controller
             'turn_number' => 'integer',
         ]);
 
+        $gameVariant = GameVariant::fromInput($request->input('game_mode'));
+        if ($gameVariant === null) {
+            throw ValidationException::withMessages([
+                'game_mode' => 'Unknown game variant.',
+            ]);
+        }
+
         $save = GameSave::create([
             'user_id' => $request->user()->id,
+            'game_mode' => $gameVariant->value,
             'name' => $request->name,
             'game_state' => $request->game_state,
             'player_count' => $request->player_count,
@@ -51,6 +62,7 @@ class GameController extends Controller
         $save = GameSave::where('user_id', $request->user()->id)->findOrFail($id);
 
         $request->validate([
+            'game_mode' => 'required|string',
             'name' => 'sometimes|string|max:255',
             'game_state' => 'required|array',
             'player_count' => 'required|integer',
@@ -58,10 +70,17 @@ class GameController extends Controller
             'turn_number' => 'integer',
         ]);
 
+        $gameVariant = GameVariant::fromInput($request->input('game_mode'));
+        if ($gameVariant === null) {
+            throw ValidationException::withMessages([
+                'game_mode' => 'Unknown game variant.',
+            ]);
+        }
+
         $save->update($request->only([
             'name', 'game_state', 'player_count',
             'current_player_name', 'turn_number',
-        ]));
+        ]) + ['game_mode' => $gameVariant->value]);
 
         return response()->json($save);
     }
@@ -90,7 +109,7 @@ class GameController extends Controller
     {
         $request->validate([
             'session_key' => 'required|string|max:100',
-            'game_mode' => 'required|string|in:classic,quick',
+            'game_mode' => 'required|string',
             'winner_name' => 'required|string',
             'winner_profession' => 'required|string',
             'winner_cash' => 'required|integer',
@@ -109,19 +128,25 @@ class GameController extends Controller
             'total_turns' => 'integer',
         ]);
 
+        $gameVariant = GameVariant::fromInput($request->input('game_mode'));
+        if ($gameVariant === null) {
+            throw ValidationException::withMessages([
+                'game_mode' => 'Unknown game variant.',
+            ]);
+        }
+
         $result = GameResult::updateOrCreate(
             [
                 'user_id' => $request->user()->id,
                 'session_key' => $request->string('session_key')->toString(),
             ],
             $request->only([
-                'game_mode',
                 'winner_name', 'winner_profession', 'winner_cash',
                 'winner_passive_income', 'winner_net_worth',
                 'player_name', 'player_profession', 'player_cash',
                 'player_passive_income', 'player_net_worth',
                 'player_count', 'did_win', 'is_completed', 'player_summaries', 'journal', 'total_turns',
-            ])
+            ]) + ['game_mode' => $gameVariant->value]
         );
 
         return response()->json($result, 201);

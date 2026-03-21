@@ -6,6 +6,44 @@ export interface StockHolding {
   currentPrice: number   // updated by market cards
 }
 
+export interface OptionPosition {
+  id: string
+  symbol: string
+  name: string
+  optionType: 'call' | 'put'
+  strikePrice: number
+  premium: number
+  contractSize: number
+  currentPrice: number
+}
+
+export interface ShortPosition {
+  id: string
+  symbol: string
+  name: string
+  shares: number
+  salePrice: number
+  currentPrice: number
+  marginReservedCash: number
+}
+
+export interface StraddlePosition {
+  id: string
+  symbol: string
+  name: string
+  strikePrice: number
+  premium: number
+  contractSize: number
+  currentPrice: number
+}
+
+export interface ExchangeOpportunity {
+  id: string
+  name: string
+  tag: string
+  purchasePrice: number
+}
+
 export interface RealEstateAsset {
   id: string
   dealId: string
@@ -54,6 +92,10 @@ export interface FinancialStatement {
   businesses: BusinessAsset[]
   stocks: StockHolding[]
   speculations: SpeculationAsset[]
+  options: OptionPosition[]
+  shortPositions: ShortPosition[]
+  straddles: StraddlePosition[]
+  exchangeOpportunities: ExchangeOpportunity[]
   // LIABILITIES (balances)
   homeMortgageBalance: number
   carLoanBalance: number
@@ -88,4 +130,8 @@ export interface PlayerStats {
   totalAssets: number
   totalLiabilities: number
   netWorth: number
+  realizedGains: number
+  unrealizedGains: number
+  marginReservedCash: number
+  portfolioValue: number
 }

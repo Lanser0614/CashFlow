@@ -16,6 +16,7 @@ import { MobileBottomBar } from '../mobile/MobileBottomBar'
 import { MobileDrawer } from '../mobile/MobileDrawer'
 import { VideoGrid } from '../video/VideoGrid'
 import { VideoControls } from '../video/VideoControls'
+import { getGameVariantModule, isQuickVariant } from '../../modules/game-variants'
 
 type Panel = 'players' | 'log' | 'video'
 type ModalState = null | 'save' | 'load'
@@ -29,7 +30,8 @@ export function GameScreen() {
   const players = useGameStore((s) => s.players)
   const currentPlayerIndex = useGameStore((s) => s.currentPlayerIndex)
   const gameMode = useGameStore((s) => s.gameMode)
-  const isQuick = gameMode === 'quick'
+  const variant = getGameVariantModule(gameMode)
+  const isQuick = isQuickVariant(gameMode)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const roomScreen = useRoomStore((s) => s.screen)
   const room = useRoomStore((s) => s.room)
@@ -75,12 +77,18 @@ export function GameScreen() {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>
-            CASH FLOW 101
+            {variant.title}
           </span>
           {isQuick && (
             <span className="text-xs px-1.5 py-0.5 rounded font-semibold"
               style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: '9px' }}>
               ⚡ БЫСТРАЯ
+            </span>
+          )}
+          {!isQuick && variant.theme === 'advanced' && (
+            <span className="text-xs px-1.5 py-0.5 rounded font-semibold"
+              style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: '9px' }}>
+              📈 202
             </span>
           )}
         </div>
@@ -131,7 +139,7 @@ export function GameScreen() {
             </>
           )}
           {/* Save/Load — desktop only, not in quick mode */}
-          {isAuthenticated && !isOnline && !isQuick && (
+          {isAuthenticated && !isOnline && variant.setup.allowSaveLoad && (
             <div className="hidden lg:flex items-center gap-1.5">
               <button
                 className="text-xs text-slate-500 hover:text-indigo-300 transition-colors px-2 py-1 rounded"

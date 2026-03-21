@@ -2,18 +2,26 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRoomStore } from '../../store/roomStore'
 import { useAuthStore } from '../../store/authStore'
-import { PROFESSIONS } from '../../data/professions'
 import { formatCurrency } from '../../utils'
 import { computePlayerStats } from '../../utils/playerStats'
 import { VideoGrid } from '../video/VideoGrid'
 import { VideoControls } from '../video/VideoControls'
+import { getGameVariantModule } from '../../modules/game-variants'
+import {
+  createCustomProfessionCard,
+  CUSTOM_FINANCIAL_FIELD_GROUPS,
+  CUSTOM_PROFESSION_ID,
+  getGameVariantLabel,
+  getOnlineRoomPath,
+  normalizeCustomFinancialProfile,
+} from '../../utils'
 
 const PLAYER_COLORS = [
   '#6366f1', '#f59e0b', '#ef4444', '#22c55e', '#ec4899', '#14b8a6',
 ]
 
 export function WaitingRoom() {
-  const { room, error, getIsHost, getMyPlayer, startOnlineGame, leaveRoom, updateMyPlayer, toggleReady, startPollingRoom, stopPollingRoom } = useRoomStore()
+  const { room, error, getIsHost, getMyPlayer, startOnlineGame, leaveRoom, updateMyPlayer, updateRoomSettings, toggleReady, startPollingRoom, stopPollingRoom } = useRoomStore()
   const userId = useAuthStore((s) => s.user?.id)
   const [copied, setCopied] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
@@ -26,13 +34,15 @@ export function WaitingRoom() {
 
   if (!room) return null
 
+  const variant = getGameVariantModule(room.game_mode)
   const isHost = getIsHost()
   const myPlayer = getMyPlayer()
   const playerCount = room.players.length
   const allReady = room.players.every((p) => p.is_ready || p.user_id === room.host_user_id)
   const canStart = isHost && playerCount >= 2 && allReady
+  const setupProfessions = [...variant.professions, createCustomProfessionCard()]
 
-  const shareLink = `${window.location.origin}?join=${room.code}`
+  const shareLink = `${window.location.origin}${getOnlineRoomPath(room.code)}`
 
   const handleCopy = async () => {
     try {
@@ -58,13 +68,23 @@ export function WaitingRoom() {
     setIsStarting(false)
   }
 
-  const getMockStats = (profId: string) => {
-    const prof = PROFESSIONS.find((p) => p.id === profId)!
+  const getProfessionPreview = (professionId: string, customProfile?: Parameters<typeof normalizeCustomFinancialProfile>[0]) => {
+    return professionId === CUSTOM_PROFESSION_ID
+      ? createCustomProfessionCard(customProfile)
+      : variant.professions.find((p) => p.id === professionId)
+  }
+
+  const getMockStats = (professionId: string, customProfile?: Parameters<typeof normalizeCustomFinancialProfile>[0]) => {
+    const prof = getProfessionPreview(professionId, customProfile)
+    if (!prof) return null
     const mockPlayer = {
-      statement: { ...prof.statement, realEstate: [], businesses: [], stocks: [], speculations: [] },
+      statement: {
+        ...prof.statement,
+        ...variant.createInitialStatement({ playerId: 'preview', profession: prof, color: '#6366f1' }),
+      },
       babies: 0,
       cash: prof.startingCash,
-    } as any
+    } as Parameters<typeof computePlayerStats>[0]
     return computePlayerStats(mockPlayer)
   }
 
@@ -100,6 +120,7 @@ export function WaitingRoom() {
         {/* Header with room code */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-white mb-3">Комната ожидания</h1>
+          <div className="text-xs text-teal-300 mb-3">Режим: {getGameVariantLabel(room.game_mode)}</div>
           <div className="inline-flex items-center gap-3 px-6 py-3 rounded-xl" style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99,102,241,0.3)' }}>
             <span className="text-sm text-slate-400">Код:</span>
             <span className="text-2xl font-mono font-bold tracking-[0.3em] text-indigo-300">{room.code}</span>
@@ -157,12 +178,32 @@ export function WaitingRoom() {
             </div>
           </div>
 
+          {isHost && (
+            <div className="mb-4">
+              <div className="text-xs text-slate-400 mb-2">Версия игры</div>
+              <select
+                value={room.game_mode}
+                onChange={(e) => updateRoomSettings({ game_mode: e.target.value as typeof room.game_mode })}
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white cursor-pointer"
+                style={{ background: '#2d3154', border: '1px solid #3d4164' }}
+              >
+                {(['cashflow101_classic', 'cashflow101_quick', 'cashflow202'] as const).map((gameMode) => (
+                  <option key={gameMode} value={gameMode}>
+                    {getGameVariantLabel(gameMode)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-3">
             {room.players.map((player) => {
               const isMe = player.user_id === userId
-              const prof = PROFESSIONS.find((p) => p.id === player.profession_id)
-              const stats = getMockStats(player.profession_id)
+              const prof = getProfessionPreview(player.profession_id, player.custom_financial_profile)
+              const stats = getMockStats(player.profession_id, player.custom_financial_profile)
               const isPlayerHost = player.user_id === room.host_user_id
+              const customProfile = normalizeCustomFinancialProfile(player.custom_financial_profile)
+              const isCustomProfession = player.profession_id === CUSTOM_PROFESSION_ID
 
               return (
                 <motion.div
@@ -221,11 +262,16 @@ export function WaitingRoom() {
                   {isMe ? (
                     <select
                       value={player.profession_id}
-                      onChange={(e) => updateMyPlayer({ profession_id: e.target.value })}
+                      onChange={(e) => updateMyPlayer({
+                        profession_id: e.target.value,
+                        custom_financial_profile: e.target.value === CUSTOM_PROFESSION_ID
+                          ? customProfile
+                          : undefined,
+                      })}
                       className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white cursor-pointer mb-2"
                       style={{ background: '#2d3154', border: '1px solid #3d4164' }}
                     >
-                      {PROFESSIONS.map((p) => (
+                      {setupProfessions.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.icon} {p.name}
                         </option>
@@ -237,8 +283,42 @@ export function WaitingRoom() {
                     </div>
                   )}
 
+                  {isMe && isCustomProfession && (
+                    <div className="space-y-3 mb-2">
+                      {CUSTOM_FINANCIAL_FIELD_GROUPS.map((group) => (
+                        <div key={group.title}>
+                          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">{group.title}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {group.fields.map((field) => (
+                              <label
+                                key={field.key}
+                                className="rounded-lg px-3 py-2 text-sm"
+                                style={{ background: field.background }}
+                              >
+                                <div className={`text-[11px] font-semibold mb-1 ${field.accentClass}`}>{field.label}</div>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={100}
+                                  value={customProfile[field.key]}
+                                  onChange={(e) => updateMyPlayer({
+                                    custom_financial_profile: normalizeCustomFinancialProfile({
+                                      ...customProfile,
+                                      [field.key]: Math.max(0, Number(e.target.value) || 0),
+                                    }),
+                                  })}
+                                  className="w-full bg-transparent text-white font-semibold focus:outline-none"
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Stats preview */}
-                  {prof && (
+                  {prof && stats && (
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="rounded-lg px-2 py-1" style={{ background: 'rgba(34, 197, 94, 0.08)' }}>
                         <span className="text-green-400">Зарп: </span>

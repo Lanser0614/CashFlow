@@ -6,5 +6,5 @@ export interface ProfessionCard {
   icon: string
   startingCash: number
   statement: Omit<FinancialStatement,
-    'realEstate' | 'businesses' | 'stocks' | 'speculations'>
+    'realEstate' | 'businesses' | 'stocks' | 'speculations' | 'options' | 'shortPositions' | 'straddles' | 'exchangeOpportunities'>
 }

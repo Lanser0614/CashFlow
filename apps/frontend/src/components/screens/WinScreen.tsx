@@ -6,15 +6,18 @@ import { useRoomStore } from '../../store/roomStore'
 import { computePlayerStats } from '../../utils/playerStats'
 import { formatCurrency } from '../../utils'
 import { flushGameResultSync } from '../../services/gameResultSync'
+import { getGameVariantModule, isQuickVariant } from '../../modules/game-variants'
 
 export function WinScreen() {
   const winner = useGameStore((s) => s.winner)
   const players = useGameStore((s) => s.players)
   const turnNumber = useGameStore((s) => s.turnNumber)
   const gameMode = useGameStore((s) => s.gameMode)
+  const variantState = useGameStore((s) => s.variantState)
   const log = useGameStore((s) => s.log)
   const resetGame = useGameStore((s) => s.resetGame)
-  const isQuick = gameMode === 'quick'
+  const variant = getGameVariantModule(gameMode)
+  const isQuick = isQuickVariant(gameMode)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const resultPosted = useRef(false)
 
@@ -36,7 +39,7 @@ export function WinScreen() {
 
   if (!winner) return null
 
-  const stats = computePlayerStats(winner)
+  const stats = computePlayerStats(winner, variantState)
 
   // Sort other players by passive income
   const otherPlayers = players
@@ -115,7 +118,7 @@ export function WinScreen() {
             >
               {isQuick
                 ? `Пассивный доход превысил расходы за ${turnNumber} ходов!`
-                : `${winner.professionName} достиг финансовой свободы!`}
+                : `${winner.professionName} победил в режиме ${variant.shortLabel}!`}
             </div>
           </motion.div>
 
@@ -163,7 +166,7 @@ export function WinScreen() {
             <div className="text-sm font-semibold text-slate-400 mb-3">Другие игроки:</div>
             <div className="space-y-2">
               {otherPlayers.map((p) => {
-                const ps = computePlayerStats(p)
+                const ps = computePlayerStats(p, variantState)
                 return (
                   <div key={p.id} className="flex items-center gap-3 flex-wrap">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: p.color }} />

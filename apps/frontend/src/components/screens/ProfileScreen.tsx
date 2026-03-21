@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { gameApi, type GameResultItem } from '../../services/api'
 import { useGameStore } from '../../store/gameStore'
-import { formatCurrency } from '../../utils'
+import { formatCurrency, getGameVariantLabel } from '../../utils'
 
 function normalizeResult(result: GameResultItem): GameResultItem {
   return {
     ...result,
     session_key: result.session_key ?? null,
-    game_mode: result.game_mode ?? 'classic',
+    game_mode: result.game_mode ?? 'cashflow101_classic',
     player_name: result.player_name ?? result.winner_name ?? null,
     player_profession: result.player_profession ?? result.winner_profession ?? null,
     player_cash: result.player_cash ?? result.winner_cash ?? 0,
@@ -27,6 +27,54 @@ function formatDate(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })}`
+}
+
+function escapeCsv(value: string | number | boolean | null): string {
+  const normalized = value === null ? '' : String(value)
+  return `"${normalized.replaceAll('"', '""')}"`
+}
+
+function downloadJournalCsv(result: GameResultItem): void {
+  const rows = [
+    [
+      'result_id',
+      'session_key',
+      'game_mode',
+      'created_at',
+      'total_turns',
+      'entry_id',
+      'timestamp',
+      'player_name',
+      'player_color',
+      'message',
+    ],
+    ...result.journal.map((entry) => [
+      result.id,
+      result.session_key,
+      result.game_mode,
+      result.created_at,
+      result.total_turns,
+      entry.id,
+      new Date(entry.timestamp).toISOString(),
+      entry.playerName,
+      entry.playerColor,
+      entry.message,
+    ]),
+  ]
+
+  const csv = rows
+    .map((row) => row.map((cell) => escapeCsv(cell)).join(','))
+    .join('\n')
+
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `cashflow-journal-${result.id}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 export function ProfileScreen() {
@@ -191,7 +239,7 @@ export function ProfileScreen() {
                     </div>
                     <div className="text-xs text-slate-400">{formatDate(result.created_at)}</div>
                     <div className="text-xs text-slate-500 mt-1">
-                      {result.game_mode === 'quick' ? 'Быстрая' : 'Классическая'} · {result.total_turns} ходов
+                      {getGameVariantLabel(result.game_mode)} · {result.total_turns} ходов
                     </div>
                   </button>
                 ))}
@@ -217,7 +265,7 @@ export function ProfileScreen() {
                       Детали партии
                     </div>
                     <h2 className="text-2xl font-bold text-white">
-                      {selectedResult.player_name || 'Игрок'} · {selectedResult.game_mode === 'quick' ? 'Быстрая' : 'Классическая'}
+                      {selectedResult.player_name || 'Игрок'} · {getGameVariantLabel(selectedResult.game_mode)}
                     </h2>
                     <div className="text-sm text-slate-400 mt-1">
                       {formatDate(selectedResult.created_at)} · Победитель: {selectedResult.winner_name}
@@ -279,7 +327,20 @@ export function ProfileScreen() {
                 </div>
 
                 <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                  <div className="text-sm font-semibold text-white mb-3">Журнал игры</div>
+                  <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                    <div className="text-sm font-semibold text-white">Журнал игры</div>
+                    <button
+                      onClick={() => downloadJournalCsv(selectedResult)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                      style={{
+                        background: 'rgba(20,184,166,0.14)',
+                        color: '#5eead4',
+                        border: '1px solid rgba(20,184,166,0.2)',
+                      }}
+                    >
+                      Скачать CSV
+                    </button>
+                  </div>
                   <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
                     {selectedResult.journal.length === 0 && (
                       <div className="text-sm text-slate-500">Журнал этой игры пуст.</div>

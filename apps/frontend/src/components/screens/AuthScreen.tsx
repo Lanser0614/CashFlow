@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '../../store/authStore'
+import { TutorialScreen } from '../tutorial/TutorialScreen'
 
 type Tab = 'login' | 'register'
 
 export function AuthScreen() {
   const [tab, setTab] = useState<Tab>('login')
+  const [showTutorial, setShowTutorial] = useState(false)
   const { login, register, playAsGuest, isLoading, error, clearError } = useAuthStore()
 
   // Login form
@@ -39,6 +41,10 @@ export function AuthScreen() {
 
   const inputClass =
     'w-full bg-transparent border-b border-white/20 px-1 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 transition-colors'
+
+  if (showTutorial) {
+    return <TutorialScreen onClose={() => setShowTutorial(false)} />
+  }
 
   return (
     <div
@@ -231,7 +237,17 @@ export function AuthScreen() {
         </div>
 
         {/* Guest mode */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-6 space-y-3">
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white border transition-colors"
+            style={{
+              background: 'rgba(20, 184, 166, 0.12)',
+              borderColor: 'rgba(20, 184, 166, 0.28)',
+            }}
+          >
+            📘 Ознакомиться с игрой
+          </button>
           <button onClick={playAsGuest} className="btn-ghost text-sm">
             Играть как гость
           </button>

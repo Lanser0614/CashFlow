@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\GameVariants\GameVariant;
+use App\GameVariants\GameVariantRegistry;
 use App\Models\GameRoom;
 use App\Models\GameRoomPlayer;
 use App\Models\RoomParticipant;
@@ -9,9 +11,12 @@ use App\Services\JanusService;
 use App\Services\NatsPublisher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 
 class RoomController extends Controller
 {
+    private const CUSTOM_PROFESSION_ID = 'custom_user_profile';
+
     public function __construct(
         private JanusService $janus,
         private NatsPublisher $nats,
@@ -21,6 +26,38 @@ class RoomController extends Controller
     private const PLAYER_COLORS = [
         '#6366f1', '#f59e0b', '#ef4444', '#22c55e', '#ec4899', '#14b8a6',
     ];
+
+    private function isProfessionAllowed(string $professionId, mixed $variantDefinition): bool
+    {
+        if ($professionId === self::CUSTOM_PROFESSION_ID) {
+            return true;
+        }
+
+        return in_array($professionId, $variantDefinition->allowedProfessionIds(), true);
+    }
+
+    private function normalizeCustomFinancialProfile(?array $profile): ?array
+    {
+        if ($profile === null) {
+            return null;
+        }
+
+        return [
+            'startingCash' => max(0, (int) ($profile['startingCash'] ?? 0)),
+            'salary' => max(0, (int) ($profile['salary'] ?? 0)),
+            'taxes' => max(0, (int) ($profile['taxes'] ?? 0)),
+            'mortgage' => max(0, (int) ($profile['mortgage'] ?? 0)),
+            'carLoan' => max(0, (int) ($profile['carLoan'] ?? 0)),
+            'creditCard' => max(0, (int) ($profile['creditCard'] ?? 0)),
+            'schoolLoan' => max(0, (int) ($profile['schoolLoan'] ?? 0)),
+            'otherExpenses' => max(0, (int) ($profile['otherExpenses'] ?? 0)),
+            'childExpenses' => max(0, (int) ($profile['childExpenses'] ?? 0)),
+            'homeMortgageBalance' => max(0, (int) ($profile['homeMortgageBalance'] ?? 0)),
+            'carLoanBalance' => max(0, (int) ($profile['carLoanBalance'] ?? 0)),
+            'creditCardBalance' => max(0, (int) ($profile['creditCardBalance'] ?? 0)),
+            'schoolLoanBalance' => max(0, (int) ($profile['schoolLoanBalance'] ?? 0)),
+        ];
+    }
 
     private function nextLogId(array $log): int
     {
@@ -111,15 +148,25 @@ class RoomController extends Controller
     {
         $request->validate([
             'max_players' => 'integer|min:2|max:6',
+            'game_mode' => 'sometimes|string',
         ]);
 
         $user = $request->user();
+        $variant = GameVariant::fromInput($request->input('game_mode'));
+        if ($request->has('game_mode') && $variant === null) {
+            throw ValidationException::withMessages([
+                'game_mode' => 'Unknown game variant.',
+            ]);
+        }
+        $variant ??= GameVariant::Cashflow101Classic;
+        $variantDefinition = GameVariantRegistry::get($variant);
 
         $room = GameRoom::create([
             'code' => GameRoom::generateCode(),
             'host_user_id' => $user->id,
             'status' => 'waiting',
             'max_players' => $request->input('max_players', 6),
+            'game_mode' => $variant->value,
         ]);
 
         // Auto-add host as first player
@@ -128,7 +175,7 @@ class RoomController extends Controller
             'user_id' => $user->id,
             'player_index' => 0,
             'player_name' => $user->name,
-            'profession_id' => 'teacher',
+            'profession_id' => $variantDefinition->defaultProfessionId(),
             'color' => self::PLAYER_COLORS[0],
         ]);
 
@@ -154,6 +201,8 @@ class RoomController extends Controller
     {
         $user = $request->user();
         $room = GameRoom::where('code', $code)->with('players')->firstOrFail();
+        $variant = GameVariant::fromInput($room->game_mode) ?? GameVariant::Cashflow101Classic;
+        $variantDefinition = GameVariantRegistry::get($variant);
 
         if ($room->status !== 'waiting') {
             return response()->json(['message' => 'Game already started'], 422);
@@ -175,7 +224,7 @@ class RoomController extends Controller
             'user_id' => $user->id,
             'player_index' => $nextIndex,
             'player_name' => $user->name,
-            'profession_id' => 'engineer',
+            'profession_id' => $variantDefinition->defaultProfessionId(),
             'color' => self::PLAYER_COLORS[$nextIndex % count(self::PLAYER_COLORS)],
         ]);
 
@@ -265,10 +314,26 @@ class RoomController extends Controller
         $request->validate([
             'player_name' => 'sometimes|string|max:20',
             'profession_id' => 'sometimes|string|max:50',
+            'custom_financial_profile' => 'sometimes|array',
+            'custom_financial_profile.startingCash' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.salary' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.taxes' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.mortgage' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.carLoan' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.creditCard' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.schoolLoan' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.otherExpenses' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.childExpenses' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.homeMortgageBalance' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.carLoanBalance' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.creditCardBalance' => 'required_with:custom_financial_profile|integer|min:0',
+            'custom_financial_profile.schoolLoanBalance' => 'required_with:custom_financial_profile|integer|min:0',
         ]);
 
         $user = $request->user();
         $room = GameRoom::where('code', $code)->firstOrFail();
+        $variant = GameVariant::fromInput($room->game_mode) ?? GameVariant::Cashflow101Classic;
+        $variantDefinition = GameVariantRegistry::get($variant);
 
         if ($room->status !== 'waiting') {
             return response()->json(['message' => 'Cannot update during game'], 422);
@@ -278,9 +343,95 @@ class RoomController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
-        $player->update($request->only(['player_name', 'profession_id']));
+        $requestedProfessionId = $request->filled('profession_id')
+            ? $request->string('profession_id')->toString()
+            : $player->profession_id;
+
+        if ($request->filled('profession_id') && !$this->isProfessionAllowed($requestedProfessionId, $variantDefinition)) {
+            throw ValidationException::withMessages([
+                'profession_id' => 'Profession is not available for this game mode.',
+            ]);
+        }
+
+        if ($requestedProfessionId === self::CUSTOM_PROFESSION_ID) {
+            $profile = $request->input('custom_financial_profile', $player->custom_financial_profile);
+            $requiredKeys = [
+                'startingCash',
+                'salary',
+                'taxes',
+                'mortgage',
+                'carLoan',
+                'creditCard',
+                'schoolLoan',
+                'otherExpenses',
+                'childExpenses',
+                'homeMortgageBalance',
+                'carLoanBalance',
+                'creditCardBalance',
+                'schoolLoanBalance',
+            ];
+
+            if (!is_array($profile) || collect($requiredKeys)->contains(fn ($key) => !array_key_exists($key, $profile))) {
+                throw ValidationException::withMessages([
+                    'custom_financial_profile' => 'Complete financial profile is required for this profile.',
+                ]);
+            }
+        }
+
+        $player->update([
+            'player_name' => $request->input('player_name', $player->player_name),
+            'profession_id' => $requestedProfessionId,
+            'custom_financial_profile' => $requestedProfessionId === self::CUSTOM_PROFESSION_ID
+                ? $this->normalizeCustomFinancialProfile($request->input('custom_financial_profile', $player->custom_financial_profile))
+                : null,
+        ]);
 
         $room->load('players');
+
+        return response()->json($room);
+    }
+
+    public function updateSettings(Request $request, string $code): JsonResponse
+    {
+        $request->validate([
+            'game_mode' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        $room = GameRoom::where('code', $code)->with('players')->firstOrFail();
+
+        if ($room->host_user_id !== $user->id) {
+            return response()->json(['message' => 'Only host can update settings'], 403);
+        }
+
+        if ($room->status !== 'waiting') {
+            return response()->json(['message' => 'Cannot update during game'], 422);
+        }
+
+        $variant = GameVariant::fromInput($request->input('game_mode'));
+        if ($variant === null) {
+            throw ValidationException::withMessages([
+                'game_mode' => 'Unknown game variant.',
+            ]);
+        }
+
+        $definition = GameVariantRegistry::get($variant);
+        $room->update(['game_mode' => $variant->value]);
+
+        foreach ($room->players as $player) {
+            $professionId = $player->profession_id;
+            if (!$this->isProfessionAllowed($professionId, $definition)) {
+                $professionId = $definition->defaultProfessionId();
+            }
+
+            $player->update([
+                'profession_id' => $professionId,
+                'custom_financial_profile' => $professionId === self::CUSTOM_PROFESSION_ID ? $player->custom_financial_profile : null,
+                'is_ready' => false,
+            ]);
+        }
+
+        $room = $room->fresh(['players']);
 
         return response()->json($room);
     }
@@ -418,6 +569,11 @@ class RoomController extends Controller
         }
 
         $newState = $request->input('game_state');
+        $roomVariant = GameVariant::fromInput($room->game_mode) ?? GameVariant::Cashflow101Classic;
+        $stateVariant = GameVariant::fromInput($newState['gameMode'] ?? null);
+        if ($stateVariant !== null && $stateVariant !== $roomVariant) {
+            return response()->json(['message' => 'Game mode mismatch'], 422);
+        }
         $newStatus = ($newState['phase'] ?? '') === 'won' ? 'finished' : 'playing';
 
         $room->update([

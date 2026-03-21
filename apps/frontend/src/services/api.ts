@@ -1,3 +1,5 @@
+import type { CustomFinancialProfile, GameVariant } from '../types'
+
 const API_BASE = '/api'
 
 function getToken(): string | null {
@@ -58,6 +60,7 @@ export interface AuthUser {
 
 export interface GameSaveListItem {
   id: number
+  game_mode: GameVariant
   name: string
   player_count: number
   current_player_name: string
@@ -71,6 +74,7 @@ export interface GameSaveDetail extends GameSaveListItem {
 }
 
 export interface CreateSavePayload {
+  game_mode: GameVariant
   name: string
   game_state: Record<string, unknown>
   player_count: number
@@ -81,7 +85,7 @@ export interface CreateSavePayload {
 export interface GameResultItem {
   id: number
   session_key: string | null
-  game_mode: 'classic' | 'quick'
+  game_mode: GameVariant
   winner_name: string
   player_name: string | null
   winner_profession: string
@@ -115,7 +119,7 @@ export interface GameResultItem {
 
 export interface CreateResultPayload {
   session_key: string
-  game_mode: 'classic' | 'quick'
+  game_mode: GameVariant
   winner_name: string
   player_name?: string
   winner_profession: string
@@ -185,6 +189,7 @@ export interface RoomPlayerInfo {
   player_index: number
   player_name: string
   profession_id: string
+  custom_financial_profile: CustomFinancialProfile | null
   color: string
   is_ready: boolean
 }
@@ -192,6 +197,7 @@ export interface RoomPlayerInfo {
 export interface RoomInfo {
   id: number
   code: string
+  game_mode: GameVariant
   host_user_id: number
   status: 'waiting' | 'playing' | 'finished'
   max_players: number
@@ -207,8 +213,8 @@ export interface RoomStateResponse {
 
 // Room API
 export const roomApi = {
-  create: (maxPlayers: number) =>
-    request<RoomInfo>('POST', '/rooms', { max_players: maxPlayers }),
+  create: (maxPlayers: number, gameMode: GameVariant) =>
+    request<RoomInfo>('POST', '/rooms', { max_players: maxPlayers, game_mode: gameMode }),
 
   show: (code: string) =>
     request<RoomInfo>('GET', `/rooms/${code}`),
@@ -219,7 +225,14 @@ export const roomApi = {
   leave: (code: string) =>
     request<{ message: string }>('POST', `/rooms/${code}/leave`),
 
-  updatePlayer: (code: string, data: { player_name?: string; profession_id?: string }) =>
+  updateSettings: (code: string, data: { game_mode: GameVariant }) =>
+    request<RoomInfo>('PATCH', `/rooms/${code}/settings`, data),
+
+  updatePlayer: (code: string, data: {
+    player_name?: string
+    profession_id?: string
+    custom_financial_profile?: CustomFinancialProfile
+  }) =>
     request<RoomInfo>('PATCH', `/rooms/${code}/player`, data),
 
   toggleReady: (code: string) =>

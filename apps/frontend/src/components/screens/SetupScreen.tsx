@@ -3,12 +3,20 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { useAuthStore } from '../../store/authStore'
 import { useRoomStore } from '../../store/roomStore'
-import { PROFESSIONS } from '../../data/professions'
-import { QUICK_PROFESSIONS } from '../../data/quickMode'
-import { formatCurrency } from '../../utils'
+import type { CustomFinancialProfile, SetupPlayer } from '../../types'
+import {
+  createCustomProfessionCard,
+  CUSTOM_FINANCIAL_FIELD_GROUPS,
+  CUSTOM_PROFESSION_ID,
+  formatCurrency,
+  getDefaultCustomFinancialProfile,
+  normalizeCustomFinancialProfile,
+} from '../../utils'
 import { computePlayerStats } from '../../utils/playerStats'
 import { TutorialScreen } from '../tutorial/TutorialScreen'
 import { SaveLoadModal } from '../game/SaveLoadModal'
+import { getGameVariantModule } from '../../modules/game-variants'
+import { navigateToLocalGame, navigateToOnlineLobby } from '../../utils'
 
 const PLAYER_COLORS = [
   { name: 'Индиго',   hex: '#6366f1' },
@@ -19,25 +27,21 @@ const PLAYER_COLORS = [
   { name: 'Бирюза',   hex: '#14b8a6' },
 ]
 
-interface PlayerSetup {
-  name: string
-  professionId: string
-}
-
 export function SetupScreen() {
   const [step, setStep] = useState<'count' | 'players' | 'preview'>('count')
   const [showTutorial, setShowTutorial] = useState(false)
   const [showLoadModal, setShowLoadModal] = useState(false)
   const [playerCount, setPlayerCount] = useState(2)
-  const [players, setPlayers] = useState<PlayerSetup[]>([
-    { name: 'Игрок 1', professionId: 'teacher' },
-    { name: 'Игрок 2', professionId: 'engineer' },
+  const [players, setPlayers] = useState<SetupPlayer[]>([
+    { name: 'Игрок 1', professionId: 'teacher', customFinancialProfile: getDefaultCustomFinancialProfile() },
+    { name: 'Игрок 2', professionId: 'engineer', customFinancialProfile: getDefaultCustomFinancialProfile() },
   ])
   const startGame = useGameStore((s) => s.startGame)
   const gameMode = useGameStore((s) => s.gameMode)
   const resetGame = useGameStore((s) => s.resetGame)
-  const isQuick = gameMode === 'quick'
-  const availableProfessions = isQuick ? QUICK_PROFESSIONS : PROFESSIONS
+  const variant = getGameVariantModule(gameMode)
+  const availableProfessions = variant.professions
+  const setupProfessions = [...availableProfessions, createCustomProfessionCard()]
   const { user, isAuthenticated, logout } = useAuthStore()
 
   const handleCountSelect = (count: number) => {
@@ -46,28 +50,58 @@ export function SetupScreen() {
       Array.from({ length: count }, (_, i) => ({
         name: `Игрок ${i + 1}`,
         professionId: availableProfessions[i % availableProfessions.length].id,
+        customFinancialProfile: getDefaultCustomFinancialProfile(),
       })),
     )
     setStep('players')
   }
 
-  const handlePlayerChange = (index: number, field: keyof PlayerSetup, value: string) => {
+  const handlePlayerChange = (index: number, field: keyof SetupPlayer, value: string) => {
     setPlayers((prev) =>
       prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
     )
   }
 
-  const handleStart = () => {
-    startGame(players)
+  const handleCustomProfileChange = (index: number, field: keyof CustomFinancialProfile, value: string) => {
+    const numericValue = Math.max(0, Number(value) || 0)
+    setPlayers((prev) =>
+      prev.map((player, playerIndex) => {
+        if (playerIndex !== index) {
+          return player
+        }
+
+        return {
+          ...player,
+          customFinancialProfile: normalizeCustomFinancialProfile({
+            ...player.customFinancialProfile,
+            [field]: numericValue,
+          }),
+        }
+      }),
+    )
   }
 
-  const getMockStats = (profId: string) => {
-    const prof = availableProfessions.find((p) => p.id === profId)!
+  const handleStart = () => {
+    startGame(players)
+    navigateToLocalGame(gameMode)
+  }
+
+  const getProfessionPreview = (player: SetupPlayer) => {
+    return player.professionId === CUSTOM_PROFESSION_ID
+      ? createCustomProfessionCard(player.customFinancialProfile)
+      : (availableProfessions.find((p) => p.id === player.professionId) ?? availableProfessions[0])
+  }
+
+  const getMockStats = (player: SetupPlayer) => {
+    const prof = getProfessionPreview(player)
     const mockPlayer = {
-      statement: { ...prof.statement, realEstate: [], businesses: [], stocks: [], speculations: [] },
+      statement: {
+        ...prof.statement,
+        ...variant.createInitialStatement({ playerId: 'preview', profession: prof, color: '#6366f1' }),
+      },
       babies: 0,
       cash: prof.startingCash,
-    } as any
+    } as Parameters<typeof computePlayerStats>[0]
     return computePlayerStats(mockPlayer)
   }
 
@@ -133,10 +167,10 @@ export function SetupScreen() {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>
-            CASH FLOW 101
+            {variant.title}
           </h1>
           <p className="text-slate-400">
-            {isQuick ? '⚡ Быстрая игра' : 'Вырвись из крысиных бегов!'}
+            {variant.description}
           </p>
         </div>
 
@@ -167,8 +201,7 @@ export function SetupScreen() {
                 </motion.button>
               ))}
             </div>
-            {/* Online play button (classic only) */}
-            {!isQuick && isAuthenticated && (
+            {variant.setup.allowOnline && isAuthenticated && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -177,7 +210,10 @@ export function SetupScreen() {
                   background: 'linear-gradient(135deg, #14b8a6, #6366f1)',
                   border: 'none',
                 }}
-                onClick={() => useRoomStore.getState().setScreen('lobby')}
+                onClick={() => {
+                  navigateToOnlineLobby()
+                  useRoomStore.getState().setScreen('lobby')
+                }}
               >
                 🌐 Играть онлайн
               </motion.button>
@@ -190,7 +226,7 @@ export function SetupScreen() {
               >
                 ← Назад
               </button>
-              {!isQuick && (
+              {variant.setup.allowTutorial && (
                 <button
                   className="btn-ghost text-sm"
                   onClick={() => setShowTutorial(true)}
@@ -198,7 +234,7 @@ export function SetupScreen() {
                   📖 Как играть?
                 </button>
               )}
-              {!isQuick && isAuthenticated && (
+              {variant.setup.allowSaveLoad && isAuthenticated && (
                 <button
                   className="btn-ghost text-sm"
                   onClick={() => setShowLoadModal(true)}
@@ -218,8 +254,10 @@ export function SetupScreen() {
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {players.map((player, i) => {
-                const prof = availableProfessions.find((p) => p.id === player.professionId)!
-                const stats = getMockStats(player.professionId)
+                const prof = getProfessionPreview(player)
+                const stats = getMockStats(player)
+                const customProfile = normalizeCustomFinancialProfile(player.customFinancialProfile)
+                const isCustomProfession = player.professionId === CUSTOM_PROFESSION_ID
                 return (
                   <motion.div
                     key={i}
@@ -251,13 +289,45 @@ export function SetupScreen() {
                         className="w-full rounded-lg px-3 py-2.5 text-base sm:text-sm font-medium text-white cursor-pointer"
                         style={{ background: '#2d3154', border: '1px solid #3d4164' }}
                       >
-                        {availableProfessions.map((p) => (
+                        {setupProfessions.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.icon} {p.name}
                           </option>
                         ))}
                       </select>
                     </div>
+
+                    {isCustomProfession && (
+                      <div className="space-y-3 mb-3">
+                        {CUSTOM_FINANCIAL_FIELD_GROUPS.map((group) => (
+                          <div key={group.title}>
+                            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">{group.title}</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {group.fields.map((field) => (
+                                <label
+                                  key={field.key}
+                                  className="rounded-lg p-3 text-sm"
+                                  style={{ background: field.background }}
+                                >
+                                  <div className={`text-xs font-semibold mb-1 ${field.accentClass}`}>{field.label}</div>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100}
+                                    value={customProfile[field.key]}
+                                    onChange={(e) => handleCustomProfileChange(i, field.key, e.target.value)}
+                                    className="w-full bg-transparent text-white font-semibold focus:outline-none"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="text-[11px] text-slate-500 px-1">
+                          Эти значения полностью заменяют стандартную профессию и формируют ваш личный финансовый отчёт.
+                        </div>
+                      </div>
+                    )}
 
                     {/* Stats preview */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -300,7 +370,7 @@ export function SetupScreen() {
 
       {/* Load game modal */}
       <AnimatePresence>
-        {showLoadModal && (
+        {showLoadModal && variant.setup.allowSaveLoad && (
           <SaveLoadModal
             onClose={() => setShowLoadModal(false)}
             initialTab="load"

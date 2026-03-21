@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rooms/{code}', [RoomController::class, 'show']);
     Route::post('/rooms/{code}/join', [RoomController::class, 'join']);
     Route::post('/rooms/{code}/leave', [RoomController::class, 'leave']);
+    Route::patch('/rooms/{code}/settings', [RoomController::class, 'updateSettings']);
     Route::patch('/rooms/{code}/player', [RoomController::class, 'updatePlayer']);
     Route::post('/rooms/{code}/ready', [RoomController::class, 'toggleReady']);
     Route::post('/rooms/{code}/start', [RoomController::class, 'startGame']);

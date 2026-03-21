@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRoomStore } from '../../store/roomStore'
+import { useGameStore } from '../../store/gameStore'
+import { getGameVariantLabel, navigateToHome } from '../../utils'
 
 export function LobbyScreen() {
   const [maxPlayers, setMaxPlayers] = useState(4)
   const [joinCode, setJoinCode] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
+  const gameMode = useGameStore((s) => s.gameMode)
   const { createRoom, joinRoom, setScreen, error, clearError } = useRoomStore()
 
   const handleCreate = async () => {
     setIsCreating(true)
     clearError()
-    await createRoom(maxPlayers)
+    await createRoom(maxPlayers, gameMode)
     setIsCreating(false)
   }
 
@@ -74,6 +77,7 @@ export function LobbyScreen() {
             Онлайн игра
           </h1>
           <p className="text-slate-400 text-sm">Играйте с друзьями на разных устройствах</p>
+          <p className="text-teal-300 text-xs mt-2">Режим комнаты: {getGameVariantLabel(gameMode)}</p>
         </div>
 
         {/* Error */}
@@ -156,7 +160,10 @@ export function LobbyScreen() {
         <div className="text-center">
           <button
             className="btn-ghost text-sm"
-            onClick={() => setScreen('none')}
+            onClick={() => {
+              navigateToHome()
+              setScreen('none')
+            }}
           >
             ← Назад
           </button>

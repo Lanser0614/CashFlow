@@ -8,10 +8,20 @@ const SHOWCASE_IDS = ['teacher', 'doctor', 'janitor', 'pilot']
 function getStats(profId: string) {
   const prof = PROFESSIONS.find((p) => p.id === profId)!
   const mockPlayer = {
-    statement: { ...prof.statement, realEstate: [], businesses: [], stocks: [], speculations: [] },
+    statement: {
+      ...prof.statement,
+      realEstate: [],
+      businesses: [],
+      stocks: [],
+      speculations: [],
+      options: [],
+      shortPositions: [],
+      straddles: [],
+      exchangeOpportunities: [],
+    },
     babies: 0,
     cash: prof.startingCash,
-  } as any
+  } as unknown as Parameters<typeof computePlayerStats>[0]
   return { prof, stats: computePlayerStats(mockPlayer) }
 }
 

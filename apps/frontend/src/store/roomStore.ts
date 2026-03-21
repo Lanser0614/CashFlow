@@ -3,7 +3,8 @@ import { roomApi, type RoomInfo, type RoomPlayerInfo } from '../services/api'
 import { useGameStore } from './gameStore'
 import { useAuthStore } from './authStore'
 import { useStreamStore } from './streamStore'
-import type { GameState, SetupPlayer } from '../types'
+import type { CustomFinancialProfile, GameState, GameVariant, SetupPlayer } from '../types'
+import { navigateToHome, navigateToOnlineRoom } from '../utils'
 
 export type RoomScreen = 'none' | 'lobby' | 'waiting' | 'game_online'
 
@@ -31,10 +32,15 @@ interface RoomState {
 
   // Actions
   setScreen: (screen: RoomScreen) => void
-  createRoom: (maxPlayers: number) => Promise<void>
+  createRoom: (maxPlayers: number, gameMode: GameVariant) => Promise<void>
   joinRoom: (code: string) => Promise<void>
   leaveRoom: () => Promise<void>
-  updateMyPlayer: (data: { player_name?: string; profession_id?: string }) => Promise<void>
+  updateMyPlayer: (data: {
+    player_name?: string
+    profession_id?: string
+    custom_financial_profile?: CustomFinancialProfile
+  }) => Promise<void>
+  updateRoomSettings: (data: { game_mode: GameVariant }) => Promise<void>
   toggleReady: () => Promise<void>
   startOnlineGame: () => Promise<void>
   refreshRoom: () => Promise<void>
@@ -58,6 +64,10 @@ let roomPollTimer: ReturnType<typeof setInterval> | null = null
 let statePollTimer: ReturnType<typeof setInterval> | null = null
 let statePushInFlight = false
 let statePushQueued = false
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
 
 export const useRoomStore = create<RoomState>()((set, get) => ({
   room: null,
@@ -92,14 +102,16 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
 
   setScreen: (screen) => set({ screen, error: null }),
 
-  createRoom: async (maxPlayers) => {
+  createRoom: async (maxPlayers, gameMode) => {
     set({ error: null })
     try {
-      const room = await roomApi.create(maxPlayers)
+      const room = await roomApi.create(maxPlayers, gameMode)
+      useGameStore.setState({ gameMode: room.game_mode })
       set({ room, screen: 'waiting' })
       saveRoomCode(room.code)
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to create room' })
+      navigateToOnlineRoom(room.code)
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to create room') })
     }
   },
 
@@ -107,10 +119,12 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     set({ error: null })
     try {
       const room = await roomApi.join(code.toUpperCase())
+      useGameStore.setState({ gameMode: room.game_mode })
       set({ room, screen: 'waiting' })
       saveRoomCode(room.code)
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to join room' })
+      navigateToOnlineRoom(room.code)
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to join room') })
     }
   },
 
@@ -127,16 +141,33 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     }
     set({ room: null, screen: 'none', stateVersion: 0 })
     clearRoomCode()
+    navigateToHome()
   },
 
-  updateMyPlayer: async (data) => {
+  updateMyPlayer: async (data: {
+    player_name?: string
+    profession_id?: string
+    custom_financial_profile?: CustomFinancialProfile
+  }) => {
     const { room } = get()
     if (!room) return
     try {
       const updated = await roomApi.updatePlayer(room.code, data)
       set({ room: updated })
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to update player') })
+    }
+  },
+
+  updateRoomSettings: async (data) => {
+    const { room } = get()
+    if (!room) return
+    try {
+      const updated = await roomApi.updateSettings(room.code, data)
+      useGameStore.setState({ gameMode: updated.game_mode })
+      set({ room: updated })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to update room settings') })
     }
   },
 
@@ -146,8 +177,8 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     try {
       const updated = await roomApi.toggleReady(room.code)
       set({ room: updated })
-    } catch (err: any) {
-      set({ error: err.message })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to toggle ready state') })
     }
   },
 
@@ -157,12 +188,14 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     set({ error: null })
     try {
       await roomApi.startGame(room.code)
+      useGameStore.setState({ gameMode: room.game_mode })
 
       // Build players array from room players
       const roomPlayers = room.players
       const setupPlayers: SetupPlayer[] = roomPlayers.map((p) => ({
         name: p.player_name,
         professionId: p.profession_id,
+        customFinancialProfile: p.custom_financial_profile ?? undefined,
       }))
 
       // Initialize game on this client (host)
@@ -171,6 +204,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       // Upload initial state to server
       set({ stateVersion: 0, screen: 'game_online' })
       saveRoomCode(room.code)
+      navigateToOnlineRoom(room.code, 'game')
 
       // Small delay so gameStore finishes initialization
       await new Promise((r) => setTimeout(r, 100))
@@ -178,8 +212,8 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
 
       // Start polling for other players
       get().startPollingState()
-    } catch (err: any) {
-      set({ error: err.message || 'Failed to start game' })
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Failed to start game') })
     }
   },
 
@@ -188,12 +222,14 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     if (!room) return
     try {
       const updated = await roomApi.show(room.code)
+      useGameStore.setState({ gameMode: updated.game_mode })
       set({ room: updated })
 
       // If room status changed to 'playing', transition to game
       if (updated.status === 'playing' && get().screen === 'waiting') {
         set({ screen: 'game_online', stateVersion: 0 })
         saveRoomCode(updated.code)
+        navigateToOnlineRoom(updated.code, 'game')
         get().stopPollingRoom()
         get().startPollingState()
       }
@@ -222,7 +258,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       const { room, stateVersion } = get()
       if (!room) return
       try {
-        const data = await roomApi.getState(room.code, stateVersion)
+          const data = await roomApi.getState(room.code, stateVersion)
         if (data) {
           // Don't override if it's my turn and I'm in the middle of an action
           const myIndex = get().getMyPlayerIndex()
@@ -264,6 +300,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     const state = useGameStore.getState()
     const serializable: Record<string, unknown> = {
       phase: state.phase,
+      gameMode: state.gameMode,
       players: state.players,
       currentPlayerIndex: state.currentPlayerIndex,
       turnPhase: state.turnPhase,
@@ -281,6 +318,10 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       doodadDeck: state.doodadDeck,
       marketDeck: state.marketDeck,
       turnNumber: state.turnNumber,
+      surpriseDeck: state.surpriseDeck,
+      surpriseDeckIndex: state.surpriseDeckIndex,
+      extraTurnFlag: state.extraTurnFlag,
+      variantState: state.variantState,
     }
 
     statePushInFlight = true
@@ -289,14 +330,14 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
       const newVersion = stateVersion + 1
       await roomApi.submitAction(room.code, serializable, newVersion)
       set({ stateVersion: newVersion })
-    } catch (err: any) {
-      console.error('Failed to push state:', err.message)
+    } catch (err: unknown) {
+      console.error('Failed to push state:', getErrorMessage(err, 'unknown error'))
       // On turn/version drift, refresh from server and continue from canonical state.
       if (
-        err.message?.includes('409') ||
-        err.message?.includes('conflict') ||
-        err.message?.includes('403') ||
-        err.message?.toLowerCase?.().includes('not your turn')
+        getErrorMessage(err, '').includes('409') ||
+        getErrorMessage(err, '').includes('conflict') ||
+        getErrorMessage(err, '').includes('403') ||
+        getErrorMessage(err, '').toLowerCase().includes('not your turn')
       ) {
         const data = await roomApi.getState(room.code, 0)
         if (data) {
@@ -320,12 +361,15 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
 
     try {
       const room = await roomApi.show(code)
+      useGameStore.setState({ gameMode: room.game_mode })
 
       if (room.status === 'playing') {
         set({ room, screen: 'game_online', stateVersion: 0 })
+        navigateToOnlineRoom(room.code, 'game')
         get().startPollingState()
       } else if (room.status === 'waiting') {
         set({ room, screen: 'waiting' })
+        navigateToOnlineRoom(room.code)
         get().startPollingRoom()
       } else {
         // finished or unknown
@@ -342,6 +386,7 @@ export const useRoomStore = create<RoomState>()((set, get) => ({
     get().stopPollingState()
     set({ room: null, screen: 'none', stateVersion: 0, error: null })
     clearRoomCode()
+    navigateToHome()
   },
 
   clearError: () => set({ error: null }),

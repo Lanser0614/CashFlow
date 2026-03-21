@@ -1,0 +1,13 @@
+{
+  "name": "kubernetes-phase-1-slides",
+  "private": true,
+  "scripts": {
+    "build": "node kubernetes-knowledge-sharing-phase-1.cjs"
+  },
+  "dependencies": {
+    "fontkit": "^2.0.4",
+    "linebreak": "^1.1.0",
+    "pptxgenjs": "^3.12.0",
+    "skia-canvas": "^2.0.2"
+  }
+}

@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 import { useRoomStore } from '../../store/roomStore'
 import { formatCurrency } from '../../utils'
 import type { SmallDeal, BigDeal, Doodad, MarketCard, SurpriseCard } from '../../types'
+import { computeExchangeSettlementValue, computeOptionSettlementValue, computeShortSettlementValue, computeStraddleSettlementValue } from '../../modules/game-variants/cashflow202/rules/trading'
 
 const CARD_TIMER_SECONDS = 30
 
@@ -249,7 +250,7 @@ function SurpriseCardContent({ card, onClose }: {
 function MarketCardContent({ card, player, onSell, onPass }: {
   card: MarketCard
   player: ReturnType<typeof useGameStore.getState>['players'][0]
-  onSell: (assetId: string, assetType: 'stock' | 'real_estate' | 'business' | 'speculation', price: number) => void
+  onSell: (assetId: string, assetType: 'stock' | 'real_estate' | 'business' | 'speculation' | 'option' | 'short' | 'straddle' | 'exchange', price: number) => void
   onPass: () => void
 }) {
   const effect = card.effect
@@ -258,7 +259,7 @@ function MarketCardContent({ card, player, onSell, onPass }: {
   const sellableAssets: Array<{
     id: string
     name: string
-    type: 'stock' | 'real_estate' | 'business' | 'speculation'
+    type: 'stock' | 'real_estate' | 'business' | 'speculation' | 'option' | 'short' | 'straddle' | 'exchange'
     sellPrice: number
     profit: number
   }> = []
@@ -275,6 +276,42 @@ function MarketCardContent({ card, player, onSell, onPass }: {
         profit: sellPrice - stock.shares * stock.purchasePrice,
       })
     }
+    player.statement.options
+      .filter((position) => position.symbol === effect.symbol)
+      .forEach((position) => {
+        const sellPrice = computeOptionSettlementValue(position)
+        sellableAssets.push({
+          id: position.id,
+          name: position.name,
+          type: 'option',
+          sellPrice,
+          profit: sellPrice - position.premium,
+        })
+      })
+    player.statement.shortPositions
+      .filter((position) => position.symbol === effect.symbol)
+      .forEach((position) => {
+        const sellPrice = computeShortSettlementValue({ ...position, currentPrice: effect.price })
+        sellableAssets.push({
+          id: position.id,
+          name: position.name,
+          type: 'short',
+          sellPrice,
+          profit: sellPrice - position.marginReservedCash,
+        })
+      })
+    player.statement.straddles
+      .filter((position) => position.symbol === effect.symbol)
+      .forEach((position) => {
+        const sellPrice = computeStraddleSettlementValue({ ...position, currentPrice: effect.price })
+        sellableAssets.push({
+          id: position.id,
+          name: position.name,
+          type: 'straddle',
+          sellPrice,
+          profit: sellPrice - position.premium,
+        })
+      })
   } else if (effect.kind === 'sell_speculation') {
     player.statement.speculations
       .filter((s) => s.tag === effect.tag)
@@ -286,6 +323,19 @@ function MarketCardContent({ card, player, onSell, onPass }: {
           type: 'speculation',
           sellPrice,
           profit: sellPrice - spec.purchasePrice,
+        })
+      })
+  } else if (effect.kind === 'exchange_offer') {
+    player.statement.exchangeOpportunities
+      .filter((position) => position.tag === effect.tag)
+      .forEach((position) => {
+        const sellPrice = computeExchangeSettlementValue(position, card)
+        sellableAssets.push({
+          id: position.id,
+          name: position.name,
+          type: 'exchange',
+          sellPrice,
+          profit: sellPrice - position.purchasePrice,
         })
       })
   } else if (effect.kind === 'real_estate_boom') {
@@ -391,12 +441,13 @@ export function CardModal() {
   const autoActionFired = useRef(false)
 
   useEffect(() => {
+    let frame = 0
     if (!timerActive) {
-      setTimeLeft(CARD_TIMER_SECONDS)
+      frame = requestAnimationFrame(() => setTimeLeft(CARD_TIMER_SECONDS))
       autoActionFired.current = false
-      return
+      return () => cancelAnimationFrame(frame)
     }
-    setTimeLeft(CARD_TIMER_SECONDS)
+    frame = requestAnimationFrame(() => setTimeLeft(CARD_TIMER_SECONDS))
     autoActionFired.current = false
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -407,7 +458,10 @@ export function CardModal() {
         return prev - 1
       })
     }, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearInterval(interval)
+    }
   }, [timerActive, turnPhase])
 
   // Fire auto-action when timer reaches 0

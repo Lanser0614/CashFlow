@@ -2,12 +2,12 @@ import { useAuthStore } from '../store/authStore'
 import { useRoomStore } from '../store/roomStore'
 import { computePlayerStats } from '../utils/playerStats'
 import type { CreateResultPayload } from './api'
-import type { GameState, Player } from '../types'
+import type { GameState, Player, VariantState } from '../types'
 
-function getLeader(players: Player[]): Player {
+function getLeader(players: Player[], variantState: VariantState): Player {
   return [...players].sort((left, right) => {
-    const leftStats = computePlayerStats(left)
-    const rightStats = computePlayerStats(right)
+    const leftStats = computePlayerStats(left, variantState)
+    const rightStats = computePlayerStats(right, variantState)
 
     if (rightStats.passiveIncome !== leftStats.passiveIncome) {
       return rightStats.passiveIncome - leftStats.passiveIncome
@@ -40,9 +40,9 @@ export function buildGameResultPayload(
     return null
   }
 
-  const winner = state.winner ?? getLeader(state.players)
-  const perspectiveStats = computePlayerStats(perspectivePlayer)
-  const winnerStats = computePlayerStats(winner)
+  const winner = state.winner ?? getLeader(state.players, state.variantState)
+  const perspectiveStats = computePlayerStats(perspectivePlayer, state.variantState)
+  const winnerStats = computePlayerStats(winner, state.variantState)
 
   return {
     session_key: sessionKey,
@@ -61,7 +61,7 @@ export function buildGameResultPayload(
     did_win: isCompleted && perspectivePlayer.id === winner.id,
     is_completed: isCompleted,
     player_summaries: state.players.map((player) => {
-      const stats = computePlayerStats(player)
+      const stats = computePlayerStats(player, state.variantState)
       return {
         name: player.name,
         profession: player.professionName,
