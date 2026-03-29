@@ -13,6 +13,7 @@ import { ProfileScreen } from './components/screens/ProfileScreen'
 import { TutorialScreen } from './components/tutorial/TutorialScreen'
 import { TutorialPromptModal } from './components/tutorial/TutorialPromptModal'
 import { initializeGameResultSync } from './services/gameResultSync'
+import { setToken } from './services/api'
 import type { GameState } from './types'
 import { buildAppPath, navigateToPath, parseAppRoute } from './utils'
 import './index.css'
@@ -64,7 +65,7 @@ function App() {
   const [showTutorial, setShowTutorial] = useState(false)
   const phase = useGameStore((s) => s.phase)
   const gameMode = useGameStore((s) => s.gameMode)
-  const { isAuthenticated, isGuest, isLoading, checkAuth, shouldPromptTutorial, dismissTutorialPrompt } = useAuthStore()
+  const { isAuthenticated, isLoading, checkAuth, shouldPromptTutorial, dismissTutorialPrompt } = useAuthStore()
   const roomScreen = useRoomStore((s) => s.screen)
   const room = useRoomStore((s) => s.room)
 
@@ -81,6 +82,25 @@ function App() {
       const route = parseAppRoute(window.location.pathname, window.location.search)
       if (route.canonicalPath !== window.location.pathname) {
         window.history.replaceState({}, '', route.canonicalPath)
+      }
+
+      if (route.kind === 'google-callback') {
+        if (route.error) {
+          useAuthStore.setState({ error: 'Ошибка входа через Google. Попробуйте снова.' })
+          window.history.replaceState({}, '', '/')
+          return
+        }
+        if (route.token && route.user) {
+          setToken(route.token)
+          const user = JSON.parse(decodeURIComponent(route.user))
+          useAuthStore.setState({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
+          })
+          window.history.replaceState({}, '', '/')
+        }
+        return
       }
 
       if (route.kind === 'profile') {
@@ -178,7 +198,7 @@ function App() {
   }, [roomScreen])
 
   useEffect(() => {
-    if (!isAuthenticated && !isGuest) {
+    if (!isAuthenticated) {
       return
     }
 
@@ -192,7 +212,7 @@ function App() {
     if (window.location.pathname !== nextPath) {
       navigateToPath(nextPath)
     }
-  }, [gameMode, isAuthenticated, isGuest, phase, room?.code, roomScreen])
+  }, [gameMode, isAuthenticated, phase, room?.code, roomScreen])
 
   // Show loading while checking auth token
   if (isLoading) {
@@ -206,8 +226,8 @@ function App() {
     )
   }
 
-  // Show auth screen if not authenticated and not guest
-  if (!isAuthenticated && !isGuest) {
+  // Show auth screen if not authenticated
+  if (!isAuthenticated) {
     return <AuthScreen />
   }
 

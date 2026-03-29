@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { authApi, setToken, clearToken, getToken, type AuthUser } from '../services/api'
 
-const GUEST_MODE_KEY = 'cashflow_guest_mode'
-
 function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
 }
@@ -10,7 +8,6 @@ function getErrorMessage(err: unknown, fallback: string): string {
 interface AuthState {
   user: AuthUser | null
   isAuthenticated: boolean
-  isGuest: boolean
   isLoading: boolean
   shouldPromptTutorial: boolean
   error: string | null
@@ -19,7 +16,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
-  playAsGuest: () => void
+  loginWithGoogle: () => Promise<void>
   dismissTutorialPrompt: () => void
   clearError: () => void
 }
@@ -27,7 +24,6 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()((set) => ({
   user: null,
   isAuthenticated: false,
-  isGuest: false,
   isLoading: true,
   shouldPromptTutorial: false,
   error: null,
@@ -42,9 +38,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
         password_confirmation: passwordConfirmation,
       })
       setToken(res.token)
-      localStorage.removeItem(GUEST_MODE_KEY)
       localStorage.setItem('cashflow_tutorial_prompt_pending', '1')
-      set({ user: res.user, isAuthenticated: true, isGuest: false, isLoading: false, shouldPromptTutorial: true })
+      set({ user: res.user, isAuthenticated: true, isLoading: false, shouldPromptTutorial: true })
     } catch (err: unknown) {
       set({ error: getErrorMessage(err, 'Ошибка регистрации'), isLoading: false })
     }
@@ -55,11 +50,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
     try {
       const res = await authApi.login({ username, password })
       setToken(res.token)
-      localStorage.removeItem(GUEST_MODE_KEY)
       set({
         user: res.user,
         isAuthenticated: true,
-        isGuest: false,
         isLoading: false,
         shouldPromptTutorial: localStorage.getItem('cashflow_tutorial_prompt_pending') === '1',
       })
@@ -75,20 +68,17 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // Token may already be invalid
     }
     clearToken()
-    localStorage.removeItem(GUEST_MODE_KEY)
-    set({ user: null, isAuthenticated: false, isGuest: false, isLoading: false, shouldPromptTutorial: false })
+    set({ user: null, isAuthenticated: false, isLoading: false, shouldPromptTutorial: false })
   },
 
   checkAuth: async () => {
     const token = getToken()
     if (!token) {
-      const isGuest = localStorage.getItem(GUEST_MODE_KEY) === '1'
-      set({ isGuest, isLoading: false, shouldPromptTutorial: false })
+      set({ isLoading: false, shouldPromptTutorial: false })
       return
     }
     try {
       const res = await authApi.getUser()
-      localStorage.removeItem(GUEST_MODE_KEY)
       set({
         user: res.user,
         isAuthenticated: true,
@@ -97,14 +87,18 @@ export const useAuthStore = create<AuthState>()((set) => ({
       })
     } catch {
       clearToken()
-      const isGuest = localStorage.getItem(GUEST_MODE_KEY) === '1'
-      set({ user: null, isAuthenticated: false, isGuest, isLoading: false, shouldPromptTutorial: false })
+      set({ user: null, isAuthenticated: false, isLoading: false, shouldPromptTutorial: false })
     }
   },
 
-  playAsGuest: () => {
-    localStorage.setItem(GUEST_MODE_KEY, '1')
-    set({ isGuest: true, isLoading: false, shouldPromptTutorial: false })
+  loginWithGoogle: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      const res = await authApi.getGoogleRedirectUrl()
+      window.location.href = res.url
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Ошибка входа через Google'), isLoading: false })
+    }
   },
 
   dismissTutorialPrompt: () => {

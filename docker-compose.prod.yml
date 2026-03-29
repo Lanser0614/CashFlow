@@ -47,6 +47,10 @@ services:
       LIVEKIT_WS_URL: ws://localhost:7880
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: secret
+      GOOGLE_CLIENT_ID: '748880834350-hj4hiqpvsqnknb102ognjomp3sq1uepr.apps.googleusercontent.com'
+      GOOGLE_CLIENT_SECRET: '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'
+      GOOGLE_REDIRECT_URI: https://api.blatnoy.uz/api/auth/google/callback
+      FRONTEND_URL: https://blatnoy.uz
     ports:
       - "8000:8000"
     volumes:

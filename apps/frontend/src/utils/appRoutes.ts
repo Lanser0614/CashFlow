@@ -10,6 +10,7 @@ type ParsedAppRoute =
   | { kind: 'local-setup'; variant: GameVariant; canonicalPath: string }
   | { kind: 'local-game'; variant: GameVariant; canonicalPath: string }
   | { kind: 'local-win'; variant: GameVariant; canonicalPath: string }
+  | { kind: 'google-callback'; token: string | null; user: string | null; error: string | null; canonicalPath: string }
 
 const VARIANT_SLUGS: Record<GameVariant, string> = {
   cashflow101_classic: 'cashflow-101-classic',
@@ -146,6 +147,16 @@ export function parseAppRoute(pathname: string, search: string): ParsedAppRoute 
   }
 
   const normalizedPath = normalizePath(pathname)
+
+  if (normalizedPath === '/auth/google/callback') {
+    return {
+      kind: 'google-callback',
+      token: params.get('token'),
+      user: params.get('user'),
+      error: params.get('error'),
+      canonicalPath: '/auth/google/callback',
+    }
+  }
 
   if (normalizedPath === '/' || normalizedPath === '/auth') {
     return { kind: 'home', canonicalPath: normalizedPath === '/auth' ? '/auth' : '/' }

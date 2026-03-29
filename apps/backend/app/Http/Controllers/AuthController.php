@@ -40,9 +40,11 @@ class AuthController extends Controller
 
         $user = User::where('username', $request->username)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (! $user || $user->password === null || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'username' => ['Неверное имя пользователя или пароль.'],
+                'username' => [$user && $user->password === null
+                    ? 'Этот аккаунт использует Google для входа.'
+                    : 'Неверное имя пользователя или пароль.'],
             ]);
         }
 

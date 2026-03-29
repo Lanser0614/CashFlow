@@ -161,6 +161,8 @@ export const authApi = {
   getUser: () => request<{ user: AuthUser }>('GET', '/user'),
 
   logout: () => request<{ message: string }>('POST', '/logout'),
+
+  getGoogleRedirectUrl: () => request<{ url: string }>('GET', '/auth/google/redirect'),
 }
 
 // Game API
