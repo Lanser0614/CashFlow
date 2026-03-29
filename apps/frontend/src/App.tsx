@@ -250,6 +250,17 @@ function App() {
     screen = <WinScreen />
   }
 
+  if (showTutorial) {
+    return (
+      <TutorialScreen
+        onClose={() => {
+          setShowTutorial(false)
+          dismissTutorialPrompt()
+        }}
+      />
+    )
+  }
+
   return (
     <>
       {screen}
@@ -258,14 +269,6 @@ function App() {
         onStart={() => setShowTutorial(true)}
         onSkip={dismissTutorialPrompt}
       />
-      {showTutorial && (
-        <TutorialScreen
-          onClose={() => {
-            setShowTutorial(false)
-            dismissTutorialPrompt()
-          }}
-        />
-      )}
     </>
   )
 }
