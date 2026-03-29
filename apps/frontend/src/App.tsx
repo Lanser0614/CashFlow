@@ -97,6 +97,7 @@ function App() {
             user,
             isAuthenticated: true,
             isLoading: false,
+            shouldPromptTutorial: true,
           })
           window.history.replaceState({}, '', '/')
         }

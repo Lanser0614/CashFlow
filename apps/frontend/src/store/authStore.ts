@@ -38,7 +38,6 @@ export const useAuthStore = create<AuthState>()((set) => ({
         password_confirmation: passwordConfirmation,
       })
       setToken(res.token)
-      localStorage.setItem('cashflow_tutorial_prompt_pending', '1')
       set({ user: res.user, isAuthenticated: true, isLoading: false, shouldPromptTutorial: true })
     } catch (err: unknown) {
       set({ error: getErrorMessage(err, 'Ошибка регистрации'), isLoading: false })
@@ -54,7 +53,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
         user: res.user,
         isAuthenticated: true,
         isLoading: false,
-        shouldPromptTutorial: localStorage.getItem('cashflow_tutorial_prompt_pending') === '1',
+        shouldPromptTutorial: true,
       })
     } catch (err: unknown) {
       set({ error: getErrorMessage(err, 'Ошибка входа'), isLoading: false })
@@ -83,7 +82,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
         user: res.user,
         isAuthenticated: true,
         isLoading: false,
-        shouldPromptTutorial: localStorage.getItem('cashflow_tutorial_prompt_pending') === '1',
+        shouldPromptTutorial: true,
       })
     } catch {
       clearToken()
@@ -102,7 +101,6 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   dismissTutorialPrompt: () => {
-    localStorage.removeItem('cashflow_tutorial_prompt_pending')
     set({ shouldPromptTutorial: false })
   },
 
