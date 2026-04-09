@@ -7,7 +7,7 @@ services:
     command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
     environment:
       VITE_API_URL: https://api.blatnoy.uz
-      VITE_LIVEKIT_URL: ws://localhost:7880
+      VITE_LIVEKIT_URL: ${LIVEKIT_WS_URL:-wss://blatnoy.uz/livekit}
     ports:
       - "5173:5173"
     volumes:
@@ -44,9 +44,9 @@ services:
       NATS_PORT: 4222
       JANUS_API_SECRET: cashflow-janus-secret
       LIVEKIT_HTTP_URL: http://livekit:7880
-      LIVEKIT_WS_URL: ws://localhost:7880
-      LIVEKIT_API_KEY: devkey
-      LIVEKIT_API_SECRET: secret
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-wss://blatnoy.uz/livekit}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URI: https://api.blatnoy.uz/api/auth/google/callback
@@ -134,7 +134,7 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
-    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    command: --dev --bind 0.0.0.0
     ports:
       - "7880:7880"
       - "7881:7881"
@@ -146,5 +146,3 @@ volumes:
   backend_vendor:
   mysql_data:
   nats_data:
-
-
